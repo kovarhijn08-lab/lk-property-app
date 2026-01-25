@@ -40,6 +40,31 @@ const AdminDashboard = ({ onClose }) => {
         currentUser?.email === 'admintest@admin.ru'
     ) || currentUser?.role === 'admin';
 
+    const sendHello = async () => {
+        try {
+            const propertiesRes = await firestoreOperations.getCollection('properties', [limit(1)]);
+            if (!propertiesRes.success || propertiesRes.data.length === 0) {
+                alert('No properties found to send message to.');
+                return;
+            }
+            const propertyId = propertiesRes.data[0].id;
+            const messageData = {
+                propertyId,
+                unitId: null,
+                userId: currentUser?.id,
+                text: 'Привет! Это тестовое сообщение от Antigravity AI. Если ты это видишь, значит переписка и уведомления работают корректно! 🚀',
+                sender: 'manager',
+                timestamp: new Date().toISOString()
+            };
+            await addDoc(collection(db, 'messages'), messageData);
+            skynet.log(`AI Test message sent to property ${propertyId}`, 'success');
+            alert('Test message sent! Check the "Chats" section.');
+        } catch (error) {
+            console.error('Send Hello Error:', error);
+            alert('Failed to send message: ' + error.message);
+        }
+    };
+
 
 
     useEffect(() => {
@@ -294,9 +319,17 @@ const AdminDashboard = ({ onClose }) => {
                     <div style={{ width: '32px', height: '32px', background: 'white', borderRadius: '50%', color: 'black', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>A</div>
                     <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 600 }}>{t('admin.title')}</h1>
                 </div>
-                <button onClick={onClose} style={{ background: '#333', border: '1px solid #444', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
-                    {t('admin.exit')}
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                        onClick={sendHello}
+                        style={{ background: 'var(--gradient-primary)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                        🤖 Send Hello Message
+                    </button>
+                    <button onClick={onClose} style={{ background: '#333', border: '1px solid #444', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
+                        {t('admin.exit')}
+                    </button>
+                </div>
             </header>
 
             {/* Navigation Tabs */}
