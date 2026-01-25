@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useAllChats } from '../hooks/useAllChats';
-import { getPropertyMetrics } from '../utils/metrics'; // Assuming we might need this or just use prop data
+
 
 const GlobalChatList = ({ properties, onNavigateToChat }) => {
     const { chats, loading, error } = useAllChats();
