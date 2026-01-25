@@ -11,6 +11,11 @@ const AdminDashboard = ({ onClose }) => {
         dbConnected: 'unknown', // 'connected', 'error'
         latency: 0
     });
+    const [diagnostics, setDiagnostics] = useState({
+        scanning: false,
+        issues: [],
+        lastRun: null
+    });
     const [loading, setLoading] = useState(false);
 
     // Only allow specific admin users (for now, simplistic check or hardcoded email)
@@ -38,6 +43,40 @@ const AdminDashboard = ({ onClose }) => {
                 dbConnected: 'error',
                 latency: 0
             });
+        }
+    };
+
+    const runDiagnostics = async () => {
+        setDiagnostics(prev => ({ ...prev, scanning: true, issues: [] }));
+        const issuesFound = [];
+
+        try {
+            const properties = await firestoreOperations.getCollection('properties');
+
+            properties.forEach(prop => {
+                const propIssues = [];
+                if (!prop.name) propIssues.push('Отсутствует название');
+                if (!prop.address) propIssues.push('Отсутствует адрес');
+                if (!prop.marketValue && prop.status !== 'sold') propIssues.push('Не указана рыночная стоимость');
+                if (prop.type === 'rental' && !prop.monthlyIncome) propIssues.push('Для аренды не указан доход');
+
+                if (propIssues.length > 0) {
+                    issuesFound.push({
+                        id: prop.id,
+                        name: prop.name || 'Без названия',
+                        issues: propIssues
+                    });
+                }
+            });
+
+            setDiagnostics({
+                scanning: false,
+                issues: issuesFound,
+                lastRun: new Date().toLocaleTimeString()
+            });
+        } catch (error) {
+            console.error('Diagnostic error:', error);
+            setDiagnostics(prev => ({ ...prev, scanning: false }));
         }
     };
 
@@ -93,31 +132,45 @@ const AdminDashboard = ({ onClose }) => {
                             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '4px 0' }}>Автоматическая проверка целостности данных и поиск ошибок</p>
                         </div>
                         <button
-                            onClick={() => {
-                                // Placeholder for deep check logic
-                                alert('Запуск глубокого сканирования базы данных...');
-                            }}
+                            onClick={runDiagnostics}
+                            disabled={diagnostics.scanning}
                             className="btn-primary"
-                            style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                            style={{ padding: '8px 16px', fontSize: '0.8rem', opacity: diagnostics.scanning ? 0.5 : 1 }}
                         >
-                            Запустить проверку
+                            {diagnostics.scanning ? 'Сканирование...' : 'Запустить проверку'}
                         </button>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: diagnostics.issues.length > 0 ? '20px' : 0 }}>
                         <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Целостность данных</div>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10B981' }}>100% OK</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: diagnostics.issues.length === 0 && diagnostics.lastRun ? '#10B981' : diagnostics.issues.length > 0 ? '#F43F5E' : 'white' }}>
+                                {diagnostics.lastRun ? (diagnostics.issues.length === 0 ? '100% OK' : `Найдено ошибок: ${diagnostics.issues.length}`) : 'Не проверялось'}
+                            </div>
                         </div>
                         <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Ошибки Sentry (24ч)</div>
-                            <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>0</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Последний запуск</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>{diagnostics.lastRun || '—'}</div>
                         </div>
                         <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
                             <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Статус AI-лекаря</div>
                             <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-primary)' }}>Активен</div>
                         </div>
                     </div>
+
+                    {diagnostics.issues.length > 0 && (
+                        <div style={{ marginTop: '16px', padding: '16px', background: 'rgba(244, 63, 94, 0.05)', borderRadius: '12px', border: '1px solid rgba(244, 63, 94, 0.2)' }}>
+                            <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: '#F43F5E' }}>⚠️ Обнаруженные проблемы:</h4>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {diagnostics.issues.map(issue => (
+                                    <div key={issue.id} style={{ fontSize: '0.8rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.1)', padding: '8px 12px', borderRadius: '8px' }}>
+                                        <span><strong>{issue.name}</strong>: {issue.issues.join(', ')}</span>
+                                        <button style={{ background: 'none', border: '1px solid rgba(255,255,255,0.2)', color: 'white', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}>Исправить</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* System Health Widget */}
