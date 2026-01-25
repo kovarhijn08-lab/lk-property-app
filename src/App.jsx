@@ -49,6 +49,7 @@ import ErrorMonitor from './components/ErrorMonitor'; // [NEW]
 import ErrorBoundary from './components/ErrorBoundary'; // [NEW]
 import { skynet } from './utils/SkynetLogger'; // [NEW]
 import GlobalChatList from './components/GlobalChatList'; // [NEW]
+import SupportChat from './components/SupportChat'; // [NEW]
 
 function App() {
   const { t } = useLanguage(); // Ensure t is available
@@ -99,6 +100,7 @@ function App() {
     return saved ? JSON.parse(saved) : { warningPeriod: 30 };
   });
   const [prefilledTransactionData, setPrefilledTransactionData] = useState(null);
+  const [showSupportChat, setShowSupportChat] = useState(false);
   const [safeMode, setSafeMode] = useState(false);
   const [loadFailures, setLoadFailures] = useState(() => {
     const saved = sessionStorage.getItem('pocketLedger_load_failures');
@@ -934,6 +936,40 @@ function App() {
           />
           {/* Admin Dashboard */}
           {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
+
+          {/* Support Chat Floating Toggle */}
+          {isAuthenticated && (
+            <>
+              {!showSupportChat && (
+                <button
+                  onClick={() => setShowSupportChat(true)}
+                  style={{
+                    position: 'fixed',
+                    bottom: isMobile ? '90px' : '30px',
+                    right: '25px',
+                    width: '56px',
+                    height: '56px',
+                    borderRadius: '18px',
+                    background: 'var(--gradient-primary)',
+                    border: 'none',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
+                    cursor: 'pointer',
+                    zIndex: 2500,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.5rem',
+                    transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                  }}
+                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
+                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                >
+                  💬
+                </button>
+              )}
+              {showSupportChat && <SupportChat onClose={() => setShowSupportChat(false)} />}
+            </>
+          )}
         </Layout>
       </ErrorMonitor>
     </ErrorBoundary>
