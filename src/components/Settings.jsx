@@ -162,7 +162,7 @@ const Settings = ({ user, onClose, onLogout, vendors, onAddVendor, onDeleteVendo
                             </button>
 
                             {/* Admin Entry Point */}
-                            {(user?.email === 'final_test_8812@example.com' || user?.email === 'admin@example.com') && (
+                            {(user?.email === 'final_test_8812@example.com' || user?.email === 'admin@example.com' || user?.email === 'admintest@admin.ru') && (
                                 <button
                                     onClick={() => {
                                         if (onOpenAdmin) onOpenAdmin();

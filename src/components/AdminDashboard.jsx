@@ -15,7 +15,7 @@ const AdminDashboard = ({ onClose }) => {
 
     // Only allow specific admin users (for now, simplistic check or hardcoded email)
     // Ideally this should be a role in the user document
-    const isAdmin = currentUser?.email === 'final_test_8812@example.com' || currentUser?.email === 'admin@example.com';
+    const isAdmin = currentUser?.email === 'final_test_8812@example.com' || currentUser?.email === 'admin@example.com' || currentUser?.email === 'admintest@admin.ru';
 
     useEffect(() => {
         if (isAdmin) {
