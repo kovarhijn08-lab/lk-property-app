@@ -75,18 +75,6 @@ function App() {
 
   const [detailInitialTab, setDetailInitialTab] = useState('overview'); // [NEW]
 
-  // ... inside renderPropertyView
-  // ...
-  if (isMobile && activeMobileView === 'chats') {
-    return <GlobalChatList
-      properties={properties}
-      onNavigateToChat={(propId) => {
-        setSelectedPropertyId(propId);
-        setDetailInitialTab('tenant'); // Open Tenant tab
-        setShowPropertyDetail(true);
-      }}
-    />;
-  }
   const [showSellModal, setShowSellModal] = useState(false);
   const [showLeaseScanner, setShowLeaseScanner] = useState(false);
   const [activeMobileView, setActiveMobileView] = useState('dashboard'); // 'dashboard', 'agenda', 'chats', 'notifications', 'portfolio'
