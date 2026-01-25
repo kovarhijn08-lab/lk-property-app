@@ -8,7 +8,7 @@ import GoalEditModal from './GoalEditModal';
 import Toast from './Toast';
 import { useLanguage } from '../context/LanguageContext';
 import { initialProperties } from '../data/properties';
-import { TrendUpIcon, TrendDownIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIcon, PlusIcon } from './Icons';
+import { TrendUpIcon, TrendDownIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIcon, PlusIcon, ExportIcon } from './Icons';
 
 const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateProperty, onAddProperty }) => {
     const { t } = useLanguage();
