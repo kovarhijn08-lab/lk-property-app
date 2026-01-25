@@ -34,7 +34,11 @@ const AdminDashboard = ({ onClose }) => {
     const { t } = useLanguage();
     const [loading, setLoading] = useState(false);
 
-    const isAdmin = currentUser?.email === 'final_test_8812@example.com' || currentUser?.email === 'admin@example.com' || currentUser?.email === 'admintest@admin.ru' || currentUser?.email === 'admintest@admin.com';
+    const isAdmin = (
+        currentUser?.email === 'final_test_8812@example.com' ||
+        currentUser?.email === 'admin@example.com' ||
+        currentUser?.email === 'admintest@admin.ru'
+    ) || currentUser?.role === 'admin';
 
 
 
@@ -457,7 +461,26 @@ const AdminDashboard = ({ onClose }) => {
                                         <td style={{ padding: '12px 20px' }}>{user.name}</td>
                                         <td style={{ padding: '12px 20px', color: '#888' }}>{user.email}</td>
                                         <td style={{ padding: '12px 20px', color: '#888' }}>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
-                                        <td style={{ padding: '12px 20px', textAlign: 'right' }}>
+                                        <td style={{ padding: '12px 20px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                            <button
+                                                onClick={async () => {
+                                                    const newRole = user.role === 'admin' ? 'user' : 'admin';
+                                                    if (window.confirm(`Change ${user.email} role to ${newRole}?`)) {
+                                                        await firestoreOperations.updateDocument('users', user.id, { role: newRole });
+                                                        skynet.log(`Admin changed role of ${user.email} to ${newRole}`, 'warning');
+                                                    }
+                                                }}
+                                                className="tag"
+                                                style={{
+                                                    background: user.role === 'admin' ? 'var(--accent-danger)' : 'rgba(255,255,255,0.1)',
+                                                    border: '1px solid var(--glass-border)',
+                                                    cursor: 'pointer',
+                                                    color: 'white',
+                                                    fontSize: '0.65rem'
+                                                }}
+                                            >
+                                                {user.role === 'admin' ? 'REVOKE ADMIN' : 'MAKE ADMIN'}
+                                            </button>
                                             <button
                                                 onClick={() => { impersonate(user); onClose(); }}
                                                 className="tag"
