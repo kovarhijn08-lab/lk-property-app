@@ -31,7 +31,41 @@ class AppErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
-            // Premium Fallback UI
+            // Check if current user is admin (using Firebase Auth directly as we are outside hooks)
+            const adminEmails = ['final_test_8812@example.com', 'admin@example.com', 'admintest@admin.ru'];
+            const { auth } = require('../firebase/config');
+            const isAdmin = auth.currentUser && adminEmails.includes(auth.currentUser.email);
+
+            if (!isAdmin) {
+                // Simple View for Regular Users
+                return (
+                    <div style={{
+                        height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: 'var(--bg-main)', color: 'white', fontFamily: 'var(--font-main)', padding: '20px', textAlign: 'center'
+                    }}>
+                        <div className="glass-panel" style={{ maxWidth: '400px', padding: '40px' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
+                            <h1 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px' }}>
+                                Ошибка, мы уже работаем над ней!
+                            </h1>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                Пожалуйста, попробуйте обновить страницу позже.
+                            </p>
+                            <button
+                                onClick={() => window.location.reload()}
+                                style={{
+                                    marginTop: '24px', padding: '12px 24px', background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid var(--glass-border)', color: 'white', borderRadius: '10px', cursor: 'pointer'
+                                }}
+                            >
+                                Обновить страницу
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            // Premium "Healer" UI for Admins
             return (
                 <div style={{
                     height: '100vh',
@@ -71,10 +105,10 @@ class AppErrorBoundary extends React.Component {
 
                         <div>
                             <h1 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '12px' }}>
-                                Система восстановления активирована
+                                Project Healer: Анализ сбоя
                             </h1>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                                Произошёл неожиданный сбой в работе интерфейса. Не волнуйтесь, мы уже отправили отчёт разработчикам (Sentry).
+                                Зафиксирована критическая ошибка. Техническая информация сохранена для анализа.
                             </p>
                         </div>
 
@@ -91,7 +125,7 @@ class AppErrorBoundary extends React.Component {
                             textOverflow: 'ellipsis',
                             whiteSpace: 'nowrap'
                         }}>
-                            Ошибка: {this.state.error?.message || "Неизвестная ошибка"}
+                            {this.state.error?.message}
                         </div>
 
                         <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
@@ -109,7 +143,7 @@ class AppErrorBoundary extends React.Component {
                                     fontSize: '0.85rem'
                                 }}
                             >
-                                Исправить и перезапустить
+                                Сбросить и исправить
                             </button>
                             <button
                                 onClick={() => window.location.href = '/'}
@@ -123,12 +157,8 @@ class AppErrorBoundary extends React.Component {
                                     cursor: 'pointer'
                                 }}
                             >
-                                На главную
+                                Dashboard
                             </button>
-                        </div>
-
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', opacity: 0.5 }}>
-                            Project Healer v1.0 • Код ошибки: {Math.random().toString(36).substring(7).toUpperCase()}
                         </div>
                     </div>
                 </div>
