@@ -34,7 +34,7 @@ const AdminDashboard = ({ onClose }) => {
     const { t } = useLanguage();
     const [loading, setLoading] = useState(false);
 
-    const isAdmin = currentUser?.email === 'final_test_8812@example.com' || currentUser?.email === 'admin@example.com' || currentUser?.email === 'admintest@admin.ru';
+    const isAdmin = currentUser?.email === 'final_test_8812@example.com' || currentUser?.email === 'admin@example.com' || currentUser?.email === 'admintest@admin.ru' || currentUser?.email === 'admintest@admin.com';
 
 
 

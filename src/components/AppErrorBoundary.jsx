@@ -39,7 +39,7 @@ class AppErrorBoundary extends React.Component {
     render() {
         if (this.state.hasError) {
             // Check if current user is admin
-            const adminEmails = ['final_test_8812@example.com', 'admin@example.com', 'admintest@admin.ru'];
+            const adminEmails = ['final_test_8812@example.com', 'admin@example.com', 'admintest@admin.ru', 'admintest@admin.com'];
             const isAdmin = auth.currentUser && adminEmails.includes(auth.currentUser.email);
 
             if (!isAdmin) {
