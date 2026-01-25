@@ -71,6 +71,7 @@ function App() {
   const [showScanner, setShowScanner] = useState(false);
   const [showScenarioPlanner, setShowScenarioPlanner] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false); // [NEW]
+  const [showSettings, setShowSettings] = useState(false);
 
   const [detailInitialTab, setDetailInitialTab] = useState('overview'); // [NEW]
 
