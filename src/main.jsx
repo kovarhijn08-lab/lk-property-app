@@ -4,6 +4,7 @@ import App from './App.jsx'
 import './index.css'
 import { LanguageProvider } from './context/LanguageContext'
 import * as Sentry from "@sentry/react";
+import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 
 Sentry.init({
   dsn: "https://0c15089037695a43d080bf6b6b5e9158@o4510769640833024.ingest.de.sentry.io/4508769642143824",
@@ -23,7 +24,9 @@ Sentry.init({
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <LanguageProvider>
-      <App />
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
     </LanguageProvider>
   </React.StrictMode>,
 )

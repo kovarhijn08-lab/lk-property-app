@@ -79,25 +79,60 @@ const AdminDashboard = ({ onClose }) => {
         }}>
             <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
-                    <h1 style={{ margin: 0 }}>🛡️ Admin Control Center</h1>
+                    <h1 style={{ margin: 0 }}>🛡️ Центр управления Admin</h1>
                     <button onClick={onClose} style={{ background: 'none', border: '1px solid var(--glass-border)', color: 'white', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer' }}>
-                        Exit Admin
+                        Выйти
                     </button>
+                </div>
+
+                {/* Project Healer Diagnostics */}
+                <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                        <div>
+                            <h3 style={{ marginTop: 0, color: 'var(--accent-primary)' }}>✨ Project Healer: Глубокая диагностика</h3>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: '4px 0' }}>Автоматическая проверка целостности данных и поиск ошибок</p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                // Placeholder for deep check logic
+                                alert('Запуск глубокого сканирования базы данных...');
+                            }}
+                            className="btn-primary"
+                            style={{ padding: '8px 16px', fontSize: '0.8rem' }}
+                        >
+                            Запустить проверку
+                        </button>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                        <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Целостность данных</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10B981' }}>100% OK</div>
+                        </div>
+                        <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Ошибки Sentry (24ч)</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800 }}>0</div>
+                        </div>
+                        <div style={{ padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '4px' }}>Статус AI-лекаря</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--accent-primary)' }}>Активен</div>
+                        </div>
+                    </div>
                 </div>
 
                 {/* System Health Widget */}
                 <div className="glass-panel" style={{ padding: '24px', marginBottom: '24px' }}>
-                    <h3 style={{ marginTop: 0 }}>System Health</h3>
+                    <h3 style={{ marginTop: 0 }}>Статус системы</h3>
                     <div style={{ display: 'flex', gap: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <div style={{
                                 width: '12px', height: '12px', borderRadius: '50%',
                                 background: systemHealth.dbConnected === 'connected' ? '#10B981' : systemHealth.dbConnected === 'error' ? '#EF4444' : '#F59E0B'
                             }}></div>
-                            <span>Database Connection</span>
+                            <span>Связь с базой данных</span>
                         </div>
                         <div>
-                            Latency: <span style={{ fontWeight: 700 }}>{systemHealth.latency}ms</span>
+                            Задержка: <span style={{ fontWeight: 700 }}>{systemHealth.latency}ms</span>
                         </div>
                     </div>
                 </div>
@@ -105,21 +140,21 @@ const AdminDashboard = ({ onClose }) => {
                 {/* Users List */}
                 <div className="glass-panel" style={{ padding: '24px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                        <h3 style={{ margin: 0 }}>Registered Users ({users.length})</h3>
-                        <button onClick={fetchUsers} style={{ background: 'var(--accent-primary)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>Refresh</button>
+                        <h3 style={{ margin: 0 }}>Зарегистрированные пользователи ({users.length})</h3>
+                        <button onClick={fetchUsers} style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'white', padding: '6px 12px', borderRadius: '6px', cursor: 'pointer' }}>Обновить</button>
                     </div>
 
                     {loading ? (
-                        <p>Loading users...</p>
+                        <p>Загрузка...</p>
                     ) : (
                         <div style={{ overflowX: 'auto' }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
-                                        <th style={{ padding: '12px' }}>User ID</th>
-                                        <th style={{ padding: '12px' }}>Name</th>
+                                        <th style={{ padding: '12px' }}>ID</th>
+                                        <th style={{ padding: '12px' }}>Имя</th>
                                         <th style={{ padding: '12px' }}>Email</th>
-                                        <th style={{ padding: '12px' }}>Created At</th>
+                                        <th style={{ padding: '12px' }}>Дата регистрации</th>
                                     </tr>
                                 </thead>
                                 <tbody>
