@@ -2,21 +2,40 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { TrashIcon, BuildingIcon, UserIcon, InfoIcon } from './Icons';
 import EmptyState from './EmptyState';
+import { validateForm } from '../utils/validators';
+
 
 const VendorList = ({ vendors = [], onAdd, onDelete }) => {
     const { t } = useLanguage();
     const [showAdd, setShowAdd] = useState(false);
     const [newVendor, setNewVendor] = useState({ name: '', category: 'General', phone: '', email: '' });
+    const [touched, setTouched] = useState({});
 
     const categories = ['Plumbing', 'Electrical', 'Cleaning', 'HVAC', 'Landscaping', 'Legal', 'General'];
 
+    const errors = validateForm('vendor', newVendor);
+    const isFormValid = Object.keys(errors).length === 0;
+
+    const renderFieldError = (fieldName) => {
+        if (!touched[fieldName] || !errors[fieldName]) return null;
+        return (
+            <div style={{ marginTop: '4px', animation: 'fadeIn 0.2s' }}>
+                <div style={{ color: '#F43F5E', fontSize: '0.65rem', fontWeight: 700 }}>⚠️ {t(errors[fieldName].message)}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.6rem', opacity: 0.7 }}>{t(errors[fieldName].example)}</div>
+            </div>
+        );
+    };
+
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!newVendor.name) return;
+        if (!isFormValid) return;
         onAdd({ ...newVendor, id: Date.now().toString() });
         setNewVendor({ name: '', category: 'General', phone: '', email: '' });
+        setTouched({});
         setShowAdd(false);
     };
+
 
     return (
         <div style={{ marginTop: '24px' }}>
@@ -58,10 +77,13 @@ const VendorList = ({ vendors = [], onAdd, onDelete }) => {
                             <input
                                 placeholder="Company LLC"
                                 value={newVendor.name}
+                                onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
                                 onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })}
-                                style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
+                                style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: touched.name && errors.name ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
                             />
+                            {renderFieldError('name')}
                         </div>
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Category</label>
                             <select
@@ -79,23 +101,32 @@ const VendorList = ({ vendors = [], onAdd, onDelete }) => {
                             <input
                                 placeholder="+1..."
                                 value={newVendor.phone}
+                                onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
                                 onChange={(e) => setNewVendor({ ...newVendor, phone: e.target.value })}
-                                style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
+                                style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: touched.phone && errors.phone ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
                             />
+                            {renderFieldError('phone')}
                         </div>
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.65rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Email</label>
                             <input
                                 placeholder="email@vendor.com"
                                 value={newVendor.email}
+                                onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
                                 onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })}
-                                style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
+                                style={{ width: '100%', padding: '12px', borderRadius: '10px', background: 'rgba(0,0,0,0.2)', border: touched.email && errors.email ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', color: 'white', outline: 'none' }}
                             />
+                            {renderFieldError('email')}
                         </div>
                     </div>
-                    <button type="submit" style={{ width: '100%', padding: '14px', borderRadius: '12px', background: 'var(--accent-success)', color: 'white', border: 'none', fontWeight: 800, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '1px', boxShadow: '0 8px 16px rgba(16, 185, 129, 0.2)' }}>
-                        Confirm Vendor
+                    <button
+                        type="submit"
+                        disabled={!isFormValid}
+                        style={{ width: '100%', padding: '14px', borderRadius: '12px', background: isFormValid ? 'var(--accent-success)' : 'rgba(255,255,255,0.05)', color: isFormValid ? 'white' : 'var(--text-secondary)', border: 'none', fontWeight: 800, cursor: isFormValid ? 'pointer' : 'not-allowed', textTransform: 'uppercase', letterSpacing: '1px', boxShadow: isFormValid ? '0 8px 16px rgba(16, 185, 129, 0.2)' : 'none' }}>
+                        {isFormValid ? 'Confirm Vendor' : t('validation.fixErrors')}
                     </button>
+
                 </form>
             )}
 

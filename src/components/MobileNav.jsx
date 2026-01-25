@@ -17,7 +17,7 @@ const MobileNav = ({ activeView, onViewChange, onActionClick, onOpenNotification
         <nav className="bottom-nav" style={{
             height: '80px',
             padding: '0 12px 14px',
-            background: 'rgba(2, 6, 23, 0.9)',
+            background: 'rgba(2, 6, 23, 0.95)', // Increased opacity
             backdropFilter: 'blur(32px)',
             WebkitBackdropFilter: 'blur(32px)',
             borderTop: '1px solid rgba(255,255,255,0.08)',
@@ -29,14 +29,15 @@ const MobileNav = ({ activeView, onViewChange, onActionClick, onOpenNotification
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 1000
+            zIndex: 9999, // Ensure highest z-index
+            pointerEvents: 'auto' // Force pointer events
         }}>
             {navItems.map(item => {
                 if (item.isAction) {
                     return (
                         <div key="plus-container" style={{ position: 'relative', width: '60px', height: '100%' }}>
                             <button
-                                onClick={onActionClick}
+                                onClick={(e) => { e.stopPropagation(); onActionClick(); }}
                                 style={{
                                     width: '64px',
                                     height: '64px',
@@ -77,7 +78,11 @@ const MobileNav = ({ activeView, onViewChange, onActionClick, onOpenNotification
                 return (
                     <button
                         key={item.id}
-                        onClick={() => item.hasNotifications ? onOpenNotifications() : onViewChange(item.id)}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            if (item.hasNotifications) onOpenNotifications();
+                            else onViewChange(item.id);
+                        }}
                         style={{
                             background: 'none',
                             border: 'none',
@@ -92,7 +97,8 @@ const MobileNav = ({ activeView, onViewChange, onActionClick, onOpenNotification
                             flex: 1,
                             cursor: 'pointer',
                             opacity: isActive ? 1 : 0.6,
-                            position: 'relative'
+                            position: 'relative',
+                            touchAction: 'manipulation' // Improve touch response
                         }}
                     >
                         <span style={{

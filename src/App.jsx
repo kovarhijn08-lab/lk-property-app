@@ -27,10 +27,11 @@ import TaskForm from './components/TaskForm';
 import Login from './components/Login';
 import SignUp from './components/SignUp';
 import MigrationHelper from './components/MigrationHelper';
-import { useFirebaseAuth } from './hooks/useFirebaseAuth';
+import { useAuth } from './context/AuthContext';
 import { useMobile } from './hooks/useMobile';
 import { useProperties } from './hooks/useProperties';
 import { useVendors } from './hooks/useVendors';
+import { useLanguage } from './context/LanguageContext';
 import { initialProperties } from './data/properties';
 import Settings from './components/Settings';
 import Toast from './components/Toast';
@@ -44,16 +45,22 @@ import ActionOverlay from './components/ActionOverlay';
 import LegalHub from './components/LegalHub';
 import TaxReport from './components/TaxReport';
 import AdminDashboard from './components/AdminDashboard'; // [NEW]
+import ErrorMonitor from './components/ErrorMonitor'; // [NEW]
+import ErrorBoundary from './components/ErrorBoundary'; // [NEW]
+import { skynet } from './utils/SkynetLogger'; // [NEW]
+import GlobalChatList from './components/GlobalChatList'; // [NEW]
 
 function App() {
+  const { t } = useLanguage(); // Ensure t is available
   // Firebase authentication (replacing mock localStorage auth)
-  const { currentUser, isAuthenticated, loading: authLoading, login, signup, logout } = useFirebaseAuth();
+  const { currentUser, isGhostMode, actualUser, isAdmin, stopImpersonation, isAuthenticated, loading: authLoading, login, signup, logout } = useAuth();
   const isMobile = useMobile();
+
   const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Properties from Firestore (replacing localStorage)
-  const { properties, loading: propertiesLoading, addProperty: addPropertyToFirestore, updateProperty: updatePropertyInFirestore, deleteProperty: deletePropertyFromFirestore } = useProperties(currentUser?.id);
+  const { properties, loading: propertiesLoading, error: propertiesError, addProperty: addPropertyToFirestore, updateProperty: updatePropertyInFirestore, deleteProperty: deletePropertyFromFirestore } = useProperties(currentUser?.id);
   const { vendors, addVendor, deleteVendor } = useVendors(currentUser?.id);
 
   const [selectedPropertyId, setSelectedPropertyId] = useState('all');
@@ -65,7 +72,20 @@ function App() {
   const [showScenarioPlanner, setShowScenarioPlanner] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false); // [NEW]
 
-  const [showSettings, setShowSettings] = useState(false);
+  const [detailInitialTab, setDetailInitialTab] = useState('overview'); // [NEW]
+
+  // ... inside renderPropertyView
+  // ...
+  if (isMobile && activeMobileView === 'chats') {
+    return <GlobalChatList
+      properties={properties}
+      onNavigateToChat={(propId) => {
+        setSelectedPropertyId(propId);
+        setDetailInitialTab('tenant'); // Open Tenant tab
+        setShowPropertyDetail(true);
+      }}
+    />;
+  }
   const [showSellModal, setShowSellModal] = useState(false);
   const [showLeaseScanner, setShowLeaseScanner] = useState(false);
   const [activeMobileView, setActiveMobileView] = useState('dashboard'); // 'dashboard', 'agenda', 'chats', 'notifications', 'portfolio'
@@ -90,6 +110,11 @@ function App() {
     return saved ? JSON.parse(saved) : { warningPeriod: 30 };
   });
   const [prefilledTransactionData, setPrefilledTransactionData] = useState(null);
+  const [safeMode, setSafeMode] = useState(false);
+  const [loadFailures, setLoadFailures] = useState(() => {
+    const saved = sessionStorage.getItem('pocketLedger_load_failures');
+    return saved ? parseInt(saved) : 0;
+  });
 
   // Sync states to localStorage (for MVP persistence as requested in roadmap/directives)
   useEffect(() => {
@@ -103,6 +128,40 @@ function App() {
   useEffect(() => {
     localStorage.setItem('pocketLedger_settings', JSON.stringify(settings));
   }, [settings]);
+
+  // Safe Mode Detection
+  useEffect(() => {
+    if (!propertiesLoading && properties) {
+      if (properties.length === 0 && !authLoading && isAuthenticated) {
+        // Potential empty or corrupted state - but not necessarily failure
+      }
+      // Reset failures on success if data is actually arriving
+      if (properties.length > 0 || !propertiesError) {
+        setLoadFailures(0);
+        sessionStorage.setItem('pocketLedger_load_failures', '0');
+      }
+    }
+
+    if (propertiesError) {
+      handleCriticalFailure();
+    }
+  }, [properties, propertiesLoading, authLoading, isAuthenticated, propertiesError]);
+
+  const handleCriticalFailure = () => {
+    const newFailures = loadFailures + 1;
+    setLoadFailures(newFailures);
+    sessionStorage.setItem('pocketLedger_load_failures', newFailures.toString());
+
+    if (newFailures >= 3) {
+      setSafeMode(true);
+    }
+  };
+
+  const resetEverything = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
+  };
 
   // Silent Migration handlers
   const handleMigrationComplete = (count, wasActive) => {
@@ -147,8 +206,39 @@ function App() {
   // Show loading while checking authentication
   if (authLoading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--text-primary)', fontSize: '1.2rem' }}>Loading...</div>
+      <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-primary)', gap: '20px' }}>
+        <div className="loading-spinner"></div>
+        <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem' }}>Authenticating Secure Link...</div>
+        {loadFailures > 1 && isAdmin && (
+          <button onClick={() => setSafeMode(true)} style={{ background: 'none', border: '1px solid var(--glass-border)', color: 'var(--accent-warning)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.7rem' }}>
+            {t('safeMode.enterSafe')}
+          </button>
+        )}
+        {loadFailures > 1 && !isAdmin && (
+          <div style={{ color: 'var(--accent-danger)', fontSize: '0.7rem', marginTop: '10px' }}>
+            {t('safeMode.loadingError')}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (safeMode) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0F172A', padding: '20px' }}>
+        <div className="glass-panel" style={{ maxWidth: '400px', padding: '32px', textAlign: 'center', border: '1px solid #F59E0B' }}>
+          <div style={{ fontSize: '3rem', marginBottom: '16px' }}>🛡️</div>
+          <h2 style={{ color: '#F59E0B', marginTop: 0 }}>{t('safeMode.title')}</h2>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
+            {t('safeMode.description')}
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
+            <button onClick={() => setSafeMode(false)} className="btn-primary" style={{ width: '100%' }}>{t('safeMode.tryRegular')}</button>
+            {isAdmin && (
+              <button onClick={resetEverything} style={{ width: '100%', padding: '12px', background: 'rgba(244, 63, 94, 0.1)', border: '1px solid #F43F5E', color: '#F43F5E', borderRadius: '12px', cursor: 'pointer', fontWeight: 700 }}>{t('safeMode.wipeCache')}</button>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -388,6 +478,31 @@ function App() {
 
   // Dynamic View Rendering
   const renderPropertyView = () => {
+    // Global Mobile Views (Priority)
+    if (isMobile && activeMobileView === 'notifications') {
+      return <MobileSmartTasks
+        properties={properties}
+        manualTasks={manualTasks}
+        onAction={handleSmartAction}
+        snoozedTasks={snoozedTasks}
+        warningPeriod={settings.warningPeriod}
+        history={taskHistory}
+      />;
+    }
+    if (isMobile && activeMobileView === 'chats') {
+      return <GlobalChatList
+        properties={properties}
+        onNavigateToChat={(propId) => {
+          setSelectedPropertyId(propId);
+          setDetailInitialTab('tenant'); // Ensure tenant tab opens
+          setShowPropertyDetail(true);
+        }}
+      />;
+    }
+    if (isMobile && activeMobileView === 'agenda') {
+      return <MobileAgenda properties={properties} />;
+    }
+
     if (selectedPropertyId === 'all') {
       if (activeMobileView === 'legal') {
         return (
@@ -415,19 +530,6 @@ function App() {
       if (activeMobileView === 'reports') {
         return <TaxReport properties={properties} onClose={() => setActiveMobileView('dashboard')} />;
       }
-      if (isMobile && activeMobileView === 'notifications') {
-        return <MobileSmartTasks
-          properties={properties}
-          manualTasks={manualTasks}
-          onAction={handleSmartAction}
-          snoozedTasks={snoozedTasks}
-          warningPeriod={settings.warningPeriod}
-          history={taskHistory}
-        />;
-      }
-      if (isMobile && activeMobileView === 'agenda') {
-        return <MobileAgenda properties={properties} />;
-      }
       return <GlobalDashboard
         properties={properties}
         onPropertyClick={(id) => { setSelectedPropertyId(id); }}
@@ -435,6 +537,8 @@ function App() {
         onUpdateProperty={updateProperty}
         onAddProperty={addProperty}
         warningPeriod={settings.warningPeriod}
+        onOpenDrawer={() => setIsDrawerOpen(true)}
+        user={currentUser}
       />;
     }
 
@@ -607,198 +711,245 @@ function App() {
   };
 
   return (
-    <Layout
-      user={currentUser}
-      onLogout={logout}
-      onOpenSettings={() => setShowSettings(true)}
-      onOpenDrawer={() => setIsDrawerOpen(true)}
-      onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
-      notificationCount={getNotificationCount()}
-    >
-      {isAuthenticated && !propertiesLoading && (
-        <MigrationHelper
-          userId={currentUser.id}
-          propertiesInCloudCount={properties.length}
-          onComplete={handleMigrationComplete}
-          onError={handleMigrationError}
-        />
-      )}
-
-      {/* Navigation Drawer */}
-      <NavigationDrawer
-        isOpen={isDrawerOpen}
-        onClose={() => setIsDrawerOpen(false)}
-        properties={properties}
-        selectedPropertyId={selectedPropertyId}
-        onSelectProperty={(id) => setSelectedPropertyId(id)}
-        onOpenSettings={() => setShowSettings(true)}
-        onAddProperty={() => setShowAddPropertyForm(true)}
-        onOpenCalendar={() => setShowCalendar(true)}
-        user={currentUser}
-        onLogout={logout}
-      />
-
-      {/* Notification Drawer */}
-      <NotificationDrawer
-        isOpen={isNotificationDrawerOpen}
-        onClose={() => setIsNotificationDrawerOpen(false)}
-        properties={properties}
-        onAction={handleSmartAction}
-        snoozedTasks={snoozedTasks}
-        warningPeriod={settings.warningPeriod}
-      />
-
-      {migrationConflict && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div className="glass-panel" style={{ maxWidth: '400px', padding: '24px', textAlign: 'center' }}>
-            <h3 style={{ marginBottom: '16px' }}>Sync Conflict</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
-              We found unsynced properties on this device. What would you like to do?
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <button onClick={() => resolveConflict('merge')} className="btn-primary" style={{ padding: '12px' }}>Merge into Cloud</button>
-              <button onClick={() => resolveConflict('cloud')} style={{ padding: '12px', background: 'transparent', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '8px', cursor: 'pointer' }}>Use Cloud Only</button>
+    <ErrorBoundary onCrash={(error, info) => skynet.log(error.message, 'crash', { stack: info.componentStack, type: 'render_crash', userId: actualUser?.id })}>
+      <ErrorMonitor user={actualUser}>
+        {isGhostMode && (
+          <div style={{
+            background: 'var(--accent-warning)',
+            color: 'black',
+            padding: '8px 20px',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 2000,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span>👁️ GHOST MODE: Viewing as <b>{currentUser.email}</b></span>
             </div>
+            <button
+              onClick={stopImpersonation}
+              style={{
+                background: 'rgba(0,0,0,0.8)',
+                color: 'white',
+                border: 'none',
+                padding: '4px 12px',
+                borderRadius: '6px',
+                fontSize: '0.7rem',
+                cursor: 'pointer',
+                fontWeight: 800
+              }}
+            >
+              EXIT GHOST MODE
+            </button>
           </div>
-        </div>
-      )}
-
-      {showTaskForm && (
-        <TaskForm
-          isOpen={showTaskForm}
-          onClose={() => setShowTaskForm(false)}
-          onAdd={handleAddTask}
-          properties={properties}
-        />
-      )}
-
-      {isActionMenuOpen && (
-        <ActionOverlay
-          isOpen={isActionMenuOpen}
-          onClose={() => setIsActionMenuOpen(false)}
-          onAddTransaction={() => { setIsActionMenuOpen(false); setShowTransactionForm(true); }}
-          onAddProperty={() => { setIsActionMenuOpen(false); setShowAddPropertyForm(true); }}
-          onUploadReceipt={() => { setIsActionMenuOpen(false); setShowScanner(true); }}
-          onScanLease={() => { setIsActionMenuOpen(false); setShowLeaseScanner(true); }}
-          onAction={handleSmartAction}
-        />
-      )}
-
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-
-      {showSettings && (
-        <Settings
-          user={currentUser}
-          vendors={vendors}
-          onAddVendor={addVendor}
-          onDeleteVendor={deleteVendor}
-          properties={properties}
-          onClose={() => setShowSettings(false)}
+        )}
+        <Layout
+          user={actualUser}
           onLogout={logout}
-          onOpenAdmin={() => { setShowSettings(false); setShowAdminDashboard(true); }} // [NEW]
-          settings={settings}
-          onUpdateSettings={(newSettings) => setSettings(prev => ({ ...prev, ...newSettings }))}
-          onUpdateSettings={(newSettings) => setSettings(prev => ({ ...prev, ...newSettings }))}
-        />
-      )}
-
-      <PropertySwitcher properties={properties} selectedId={selectedPropertyId} onSelect={setSelectedPropertyId} />
-
-      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
-        <Breadcrumbs
-          paths={selectedPropertyId !== 'all' && selectedProperty ? [{ label: selectedProperty.name, id: selectedProperty.id }] : []}
-          onNavigate={(id) => setSelectedPropertyId(id)}
-        />
-      </div>
-
-      {/* Removed NotificationPanel from here - now in NotificationDrawer */}
-      {renderPropertyView()}
-
-      {/* Modals */}
-      {showScanner && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ width: '100%', maxWidth: '400px' }}>
-            <button onClick={() => setShowScanner(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer' }}>×</button>
-            <ReceiptScanner onScanComplete={handleScanComplete} />
-          </div>
-        </div>
-      )}
-      {showCalendar && (
-        <MasterCalendar
-          properties={properties}
-          onClose={() => setShowCalendar(false)}
-        />
-      )}
-      {showScenarioPlanner && selectedProperty && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <ScenarioPlanner property={selectedProperty} onClose={() => setShowScenarioPlanner(false)} />
-        </div>
-      )}
-      {showTransactionForm && selectedProperty && (
-        <TransactionForm
-          vendors={vendors}
-          onSubmit={addTransaction}
-          onClose={() => { setShowTransactionForm(false); setPrefilledTransactionData(null); }}
-          initialData={prefilledTransactionData}
-        />
-      )}
-      {showAddPropertyForm && (
-        <AddPropertyForm onSubmit={addProperty} onClose={() => setShowAddPropertyForm(false)} />
-      )}
-      {showPropertyDetail && selectedProperty && (
-        <PropertyDetail
-          property={selectedProperty}
-          onUpdate={updateProperty}
-          onDelete={deleteProperty}
-          onSell={() => { setShowPropertyDetail(false); setShowSellModal(true); }}
-          onClose={() => setShowPropertyDetail(false)}
-          vendors={vendors}
-          onAddVendor={addVendor}
-          onDeleteVendor={deleteVendor}
-        />
-      )}
-      {showSellModal && selectedProperty && (
-        <SellPropertyModal
-          property={selectedProperty}
-          onClose={() => setShowSellModal(false)}
-          onSell={handleSellProperty}
-        />
-      )}
-      {showLeaseScanner && (
-        <LeaseScanner
-          onScanComplete={handleLeaseScanComplete}
-          onClose={() => setShowLeaseScanner(false)}
-        />
-      )}
-      {isAuthenticated && isMobile && (
-        <MobileNav
-          activeView={activeMobileView}
-          onViewChange={(v) => {
-            setActiveMobileView(v);
-            if (v === 'portfolio') {
-              setSelectedPropertyId('all');
-            }
-          }}
-          onActionClick={() => setIsActionMenuOpen(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
           onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
           notificationCount={getNotificationCount()}
-        />
-      )}
-      <TermDictionary isOpen={showDictionary} onClose={() => setShowDictionary(false)} />
+        >
+          {isAuthenticated && !propertiesLoading && (
+            <MigrationHelper
+              userId={currentUser.id}
+              propertiesInCloudCount={properties.length}
+              onComplete={handleMigrationComplete}
+              onError={handleMigrationError}
+            />
+          )}
 
-      {/* Action Overlay */}
-      <ActionOverlay
-        isOpen={isActionMenuOpen}
-        onClose={() => setIsActionMenuOpen(false)}
-        onAddTransaction={() => setShowTransactionForm(true)}
-        onAddProperty={() => setShowAddPropertyForm(true)}
-        onUploadReceipt={() => setShowScanner(true)}
-        onScanLease={() => setShowLeaseScanner(true)}
-      />
-      {/* Admin Dashboard */}
-      {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
-    </Layout>
+          {/* Navigation Drawer */}
+          <NavigationDrawer
+            isOpen={isDrawerOpen}
+            onClose={() => setIsDrawerOpen(false)}
+            properties={properties}
+            selectedPropertyId={selectedPropertyId}
+            onSelectProperty={(id) => {
+              setSelectedPropertyId(id);
+              // Reset to overview when opening from drawer
+              // We might need a way to pass initialTab here too if needed, but default is fine
+            }}
+            onOpenSettings={() => setShowSettings(true)}
+            onAddProperty={() => setShowAddPropertyForm(true)}
+            onOpenCalendar={() => setShowCalendar(true)}
+            user={currentUser}
+            onLogout={logout}
+          />
+
+          {/* Notification Drawer */}
+          <NotificationDrawer
+            isOpen={isNotificationDrawerOpen}
+            onClose={() => setIsNotificationDrawerOpen(false)}
+            properties={properties}
+            onAction={handleSmartAction}
+            snoozedTasks={snoozedTasks}
+            warningPeriod={settings.warningPeriod}
+          />
+
+          {migrationConflict && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+              <div className="glass-panel" style={{ maxWidth: '400px', padding: '24px', textAlign: 'center' }}>
+                <h3 style={{ marginBottom: '16px' }}>Sync Conflict</h3>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '24px' }}>
+                  We found unsynced properties on this device. What would you like to do?
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <button onClick={() => resolveConflict('merge')} className="btn-primary" style={{ padding: '12px' }}>Merge into Cloud</button>
+                  <button onClick={() => resolveConflict('cloud')} style={{ padding: '12px', background: 'transparent', border: '1px solid var(--glass-border)', color: 'white', borderRadius: '8px', cursor: 'pointer' }}>Use Cloud Only</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {showTaskForm && (
+            <TaskForm
+              isOpen={showTaskForm}
+              onClose={() => setShowTaskForm(false)}
+              onAdd={handleAddTask}
+              properties={properties}
+            />
+          )}
+
+          {isActionMenuOpen && (
+            <ActionOverlay
+              isOpen={isActionMenuOpen}
+              onClose={() => setIsActionMenuOpen(false)}
+              onAddTransaction={() => { setIsActionMenuOpen(false); setShowTransactionForm(true); }}
+              onAddProperty={() => { setIsActionMenuOpen(false); setShowAddPropertyForm(true); }}
+              onUploadReceipt={() => { setIsActionMenuOpen(false); setShowScanner(true); }}
+              onScanLease={() => { setIsActionMenuOpen(false); setShowLeaseScanner(true); }}
+              onAction={handleSmartAction}
+            />
+          )}
+
+          {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+          {showSettings && (
+            <Settings
+              user={currentUser}
+              vendors={vendors}
+              onAddVendor={addVendor}
+              onDeleteVendor={deleteVendor}
+              properties={properties}
+              onClose={() => setShowSettings(false)}
+              onLogout={logout}
+              onOpenAdmin={() => { setShowSettings(false); setShowAdminDashboard(true); }} // [NEW]
+              settings={settings}
+              onUpdateSettings={(newSettings) => setSettings(prev => ({ ...prev, ...newSettings }))}
+            />
+          )}
+
+          <PropertySwitcher properties={properties} selectedId={selectedPropertyId} onSelect={setSelectedPropertyId} />
+
+          <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+            <Breadcrumbs
+              paths={selectedPropertyId !== 'all' && selectedProperty ? [{ label: selectedProperty.name, id: selectedProperty.id }] : []}
+              onNavigate={(id) => setSelectedPropertyId(id)}
+            />
+          </div>
+
+          {/* Removed NotificationPanel from here - now in NotificationDrawer */}
+          {renderPropertyView()}
+
+          {/* Modals */}
+          {showScanner && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+              <div style={{ width: '100%', maxWidth: '400px' }}>
+                <button onClick={() => setShowScanner(false)} style={{ position: 'absolute', top: 20, right: 20, background: 'none', border: 'none', color: 'white', fontSize: '2rem', cursor: 'pointer' }}>×</button>
+                <ReceiptScanner onScanComplete={handleScanComplete} />
+              </div>
+            </div>
+          )}
+          {showCalendar && (
+            <MasterCalendar
+              properties={properties}
+              onClose={() => setShowCalendar(false)}
+            />
+          )}
+          {showScenarioPlanner && selectedProperty && (
+            <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+              <ScenarioPlanner property={selectedProperty} onClose={() => setShowScenarioPlanner(false)} />
+            </div>
+          )}
+          {showTransactionForm && selectedProperty && (
+            <TransactionForm
+              vendors={vendors}
+              onSubmit={addTransaction}
+              onClose={() => { setShowTransactionForm(false); setPrefilledTransactionData(null); }}
+              initialData={prefilledTransactionData}
+            />
+          )}
+          {showAddPropertyForm && (
+            <AddPropertyForm onSubmit={addProperty} onClose={() => setShowAddPropertyForm(false)} />
+          )}
+          {showPropertyDetail && selectedProperty && (
+            <PropertyDetail
+              property={selectedProperty}
+              onUpdate={updateProperty}
+              onDelete={deleteProperty}
+              onSell={() => { setShowPropertyDetail(false); setShowSellModal(true); }}
+              onClose={() => {
+                setShowPropertyDetail(false);
+                setDetailInitialTab('overview');
+              }}
+              vendors={vendors}
+              initialTab={detailInitialTab}
+              onAddVendor={addVendor}
+              onDeleteVendor={deleteVendor}
+            />
+          )}
+          {showSellModal && selectedProperty && (
+            <SellPropertyModal
+              property={selectedProperty}
+              onClose={() => setShowSellModal(false)}
+              onSell={handleSellProperty}
+            />
+          )}
+          {showLeaseScanner && (
+            <LeaseScanner
+              onScanComplete={handleLeaseScanComplete}
+              onClose={() => setShowLeaseScanner(false)}
+            />
+          )}
+          {isAuthenticated && isMobile && (
+            <MobileNav
+              activeView={activeMobileView}
+              onViewChange={(v) => {
+                setActiveMobileView(v);
+                if (v === 'portfolio') {
+                  setSelectedPropertyId('all');
+                }
+              }}
+              onActionClick={() => setIsActionMenuOpen(true)}
+              onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
+              notificationCount={getNotificationCount()}
+            />
+          )}
+          <TermDictionary isOpen={showDictionary} onClose={() => setShowDictionary(false)} />
+
+          {/* Action Overlay */}
+          <ActionOverlay
+            isOpen={isActionMenuOpen}
+            onClose={() => setIsActionMenuOpen(false)}
+            onAddTransaction={() => setShowTransactionForm(true)}
+            onAddProperty={() => setShowAddPropertyForm(true)}
+            onUploadReceipt={() => setShowScanner(true)}
+            onScanLease={() => setShowLeaseScanner(true)}
+          />
+          {/* Admin Dashboard */}
+          {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
+        </Layout>
+      </ErrorMonitor>
+    </ErrorBoundary>
   );
 }
+
 
 export default App;

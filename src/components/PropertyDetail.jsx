@@ -13,8 +13,9 @@ import FinancialPlanner from './FinancialPlanner';
 import SideDrawer from './SideDrawer';
 import TenantPortal from './TenantPortal';
 import { EditIcon, TrashIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIcon, InfoIcon } from './Icons';
+import { validateForm } from '../utils/validators';
 
-const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors, onAddVendor, onDeleteVendor }) => {
+const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors, onAddVendor, onDeleteVendor, initialTab = 'overview' }) => {
     const { t } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -23,17 +24,33 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
     const [showBookingForm, setShowBookingForm] = useState(false);
     const [editingBooking, setEditingBooking] = useState(null);
     const [bookingToDelete, setBookingToDelete] = useState(null);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState(initialTab);
 
     // Edit Form State
     const [editedProp, setEditedProp] = useState({ ...property });
+    const [hasMultipleUnits, setHasMultipleUnits] = useState((property.units?.length || 0) > 1);
+    const [errors, setErrors] = useState({});
+    const [touched, setTouched] = useState({});
 
     // Keep editedProp in sync when property changes externally
     useEffect(() => {
         setEditedProp({ ...property });
     }, [property]);
 
+    // Validate on edit
+    useEffect(() => {
+        if (isEditing) {
+            const currentErrors = validateForm('property', {
+                ...editedProp,
+                marketValue: editedProp.marketValue, // Ensure we pass numbers if validators expect them
+                purchasePrice: editedProp.purchasePrice
+            });
+            setErrors(currentErrors);
+        }
+    }, [editedProp, isEditing]);
+
     const handleSave = async () => {
+        if (Object.keys(errors).length > 0) return;
         setIsSaving(true);
         try {
             await onUpdate(property.id, editedProp);
@@ -76,6 +93,17 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
             return newState;
         });
     };
+
+    const renderFieldError = (fieldName, value) => {
+        if ((!touched[fieldName] && !value) || !errors[fieldName]) return null;
+        return (
+            <div style={{ marginTop: '4px' }}>
+                <div style={{ color: '#F43F5E', fontSize: '0.7rem', fontWeight: 700 }}>⚠️ {t(errors[fieldName].message)}</div>
+            </div>
+        );
+    };
+
+    const isFormValid = Object.keys(errors).length === 0;
 
     return (
         <SideDrawer
@@ -159,9 +187,11 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                 <input
                                     type="text"
                                     value={editedProp.name}
+                                    onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
                                     onChange={(e) => handleChange('name', e.target.value)}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: touched.name && errors.name ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
                                 />
+                                {renderFieldError('name', editedProp.name)}
                             </div>
                             <div>
                                 <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{t('property.type')}</label>
@@ -189,16 +219,54 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                             </div>
                         </div>
 
-                        {/* Unit Management bulk edit */}
-                        {(editedProp.type === 'rental' || editedProp.type === 'commercial') && (
-                            <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{t('property.numUnits')}</label>
-                                <input
-                                    type="number"
-                                    value={editedProp.units?.length || 0}
-                                    onChange={(e) => handleChange('unitCount', e.target.value)}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
-                                />
+                        {/* Unit Management bulk edit for Commercial only */}
+                        {editedProp.type === 'commercial' && (
+                            <div style={{ marginBottom: '16px' }}>
+                                <div style={{
+                                    padding: '12px',
+                                    background: 'rgba(255,255,255,0.03)',
+                                    borderRadius: '12px',
+                                    border: '1px solid var(--glass-border)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    marginBottom: hasMultipleUnits ? '16px' : '0',
+                                    cursor: 'pointer'
+                                }} onClick={() => setHasMultipleUnits(!hasMultipleUnits)}>
+                                    <div style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                                        {t('validation.multiUnitToggle')}
+                                    </div>
+                                    <div style={{
+                                        width: '34px',
+                                        height: '20px',
+                                        background: hasMultipleUnits ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.1)',
+                                        borderRadius: '10px',
+                                        position: 'relative'
+                                    }}>
+                                        <div style={{
+                                            width: '14px',
+                                            height: '14px',
+                                            background: 'white',
+                                            borderRadius: '50%',
+                                            position: 'absolute',
+                                            top: '3px',
+                                            left: hasMultipleUnits ? '17px' : '3px',
+                                            transition: 'left 0.2s'
+                                        }} />
+                                    </div>
+                                </div>
+
+                                {hasMultipleUnits && (
+                                    <div style={{ animation: 'fadeIn 0.3s' }}>
+                                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{t('property.numUnits')}</label>
+                                        <input
+                                            type="number"
+                                            value={editedProp.units?.length || 0}
+                                            onChange={(e) => handleChange('unitCount', e.target.value)}
+                                            style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         )}
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
@@ -207,8 +275,9 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                 <input
                                     type="number"
                                     value={editedProp.purchasePrice}
+                                    onBlur={() => setTouched(prev => ({ ...prev, purchasePrice: true }))}
                                     onChange={(e) => handleChange('purchasePrice', e.target.value)}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: touched.purchasePrice && errors.purchasePrice ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
                                 />
                             </div>
                             <div>
@@ -216,8 +285,9 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                 <input
                                     type="number"
                                     value={editedProp.marketValue}
+                                    onBlur={() => setTouched(prev => ({ ...prev, marketValue: true }))}
                                     onChange={(e) => handleChange('marketValue', e.target.value)}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: touched.marketValue && errors.marketValue ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
                                 />
                             </div>
                         </div>
@@ -246,9 +316,11 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                             <input
                                 type="text"
                                 value={editedProp.address || ''}
+                                onBlur={() => setTouched(prev => ({ ...prev, address: true }))}
                                 onChange={(e) => handleChange('address', e.target.value)}
-                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
+                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: touched.address && errors.address ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)', background: 'rgba(0,0,0,0.2)', color: 'white', outline: 'none' }}
                             />
+                            {renderFieldError('address', editedProp.address)}
                         </div>
 
                         {/* Commercial Specific Settings */}
@@ -366,10 +438,18 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                             </button>
                             <button
                                 onClick={handleSave}
-                                disabled={isSaving}
-                                style={{ flex: 1, padding: '14px', borderRadius: '14px', border: 'none', background: 'var(--gradient-primary)', color: 'white', fontWeight: 800, cursor: 'pointer', opacity: isSaving ? 0.5 : 1, textTransform: 'uppercase', fontSize: '0.8rem', boxShadow: '0 10px 15px -3px rgba(99, 102, 241, 0.4)' }}
+                                disabled={isSaving || !isFormValid}
+                                style={{
+                                    flex: 1, padding: '14px', borderRadius: '14px', border: 'none',
+                                    background: isFormValid ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)',
+                                    color: isFormValid ? 'white' : 'var(--text-secondary)',
+                                    fontWeight: 800, cursor: isFormValid ? 'pointer' : 'not-allowed',
+                                    opacity: isSaving ? 0.5 : 1, textTransform: 'uppercase', fontSize: '0.8rem',
+                                    boxShadow: isFormValid ? '0 10px 15px -3px rgba(99, 102, 241, 0.4)' : 'none',
+                                    transition: 'all 0.3s'
+                                }}
                             >
-                                {isSaving ? t('property.saving') : t('property.saveChanges')}
+                                {isSaving ? t('property.saving') : (isFormValid ? t('property.saveChanges') : t('validation.fixErrors'))}
                             </button>
                         </div>
                     </div>

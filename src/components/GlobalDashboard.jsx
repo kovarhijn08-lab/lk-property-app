@@ -10,7 +10,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { initialProperties } from '../data/properties';
 import { TrendUpIcon, TrendDownIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIcon, PlusIcon, ExportIcon } from './Icons';
 
-const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateProperty, onAddProperty }) => {
+const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateProperty, onAddProperty, onOpenDrawer, user }) => {
     const { t } = useLanguage();
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [editingPropertyId, setEditingPropertyId] = useState(null);
@@ -107,6 +107,44 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Mobile Header for Profile Access */}
+            <div className="mobile-only" style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '10px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ fontWeight: 900, fontSize: '1.1rem', fontFamily: 'var(--font-display)', color: 'white' }}>POCKET LEDGER</div>
+                </div>
+                <button
+                    onClick={onOpenDrawer}
+                    style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '12px',
+                        background: 'var(--gradient-primary)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: 'none',
+                        color: 'white',
+                        fontWeight: 900,
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)'
+                    }}
+                >
+                    {user?.name ? user.name.charAt(0).toUpperCase() : (user?.email?.charAt(0).toUpperCase() || 'U')}
+                </button>
+            </div>
+
+            <style>{`
+                @media (min-width: 768px) {
+                    .mobile-only { display: none !important; }
+                }
+            `}</style>
+
             <GoalTracker
                 currentCashFlow={totalCashFlow}
                 goalAmount={totalGoal || 10000}

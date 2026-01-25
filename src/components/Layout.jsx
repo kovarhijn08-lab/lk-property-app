@@ -62,7 +62,7 @@ const Layout = ({ children, onOpenSettings, user, onLogout, onOpenDrawer, onOpen
           borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {onOpenDrawer && !isMobile && (
+            {onOpenDrawer && (
               <button
                 onClick={onOpenDrawer}
                 style={{

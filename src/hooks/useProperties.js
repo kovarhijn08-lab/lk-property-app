@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useFirestoreCollection, firestoreOperations } from './useFirestore';
 import { where } from 'firebase/firestore';
+import { skynet } from '../utils/SkynetLogger';
 
 /**
  * Хук для работы с properties через Firestore
@@ -36,11 +37,21 @@ export const useProperties = (userId) => {
             updatedAt: new Date().toISOString()
         };
 
-        return await firestoreOperations.setDocument(
+        const response = await firestoreOperations.setDocument(
             'properties',
             newProperty.id,
             newProperty
         );
+
+        if (response.success) {
+            skynet.log(`New property created: "${newProperty.name}"`, 'success', {
+                userId,
+                propertyId: newProperty.id,
+                type: 'property_creation'
+            });
+        }
+
+        return response;
     };
 
     /**
@@ -51,7 +62,22 @@ export const useProperties = (userId) => {
             return { success: false, error: 'User not authenticated' };
         }
 
-        return await firestoreOperations.updateDocument(
+        // Create snapshot for Undo
+        try {
+            const currentDoc = await firestoreOperations.getDocument('properties', propertyId);
+            if (currentDoc.success) {
+                await skynet.log(`Snapshot created for "${propertyId}"`, 'info', {
+                    type: 'snapshot',
+                    collection: 'properties',
+                    docId: propertyId,
+                    data: currentDoc.data
+                });
+            }
+        } catch (e) {
+            console.warn('Undo snapshot failed:', e);
+        }
+
+        const response = await firestoreOperations.updateDocument(
             'properties',
             propertyId,
             {
@@ -59,6 +85,16 @@ export const useProperties = (userId) => {
                 updatedAt: new Date().toISOString()
             }
         );
+
+        if (response.success) {
+            skynet.log(`Property updated: "${propertyId}"`, 'info', {
+                userId,
+                propertyId,
+                type: 'property_update'
+            });
+        }
+
+        return response;
     };
 
     /**
@@ -69,10 +105,35 @@ export const useProperties = (userId) => {
             return { success: false, error: 'User not authenticated' };
         }
 
-        return await firestoreOperations.deleteDocument(
+        // Create snapshot for Undo
+        try {
+            const currentDoc = await firestoreOperations.getDocument('properties', propertyId);
+            if (currentDoc.success) {
+                await skynet.log(`Delete snapshot for "${propertyId}"`, 'warning', {
+                    type: 'deletion_snapshot',
+                    collection: 'properties',
+                    docId: propertyId,
+                    data: currentDoc.data
+                });
+            }
+        } catch (e) {
+            console.warn('Delete snapshot failed:', e);
+        }
+
+        const response = await firestoreOperations.deleteDocument(
             'properties',
             propertyId
         );
+
+        if (response.success) {
+            skynet.log(`Property deleted: "${propertyId}"`, 'warning', {
+                userId,
+                propertyId,
+                type: 'property_deletion'
+            });
+        }
+
+        return response;
     };
 
     return {

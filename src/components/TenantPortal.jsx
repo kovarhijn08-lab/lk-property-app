@@ -1,63 +1,66 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
+import { useMessaging } from '../hooks/useMessaging';
+import { useMaintenance } from '../hooks/useMaintenance';
 import { SendIcon, InfoIcon, ToolIcon, DollarIcon, ChevronDownIcon } from './Icons';
 
 const TenantPortal = ({ property, transactions = [] }) => {
     const { t } = useLanguage();
+    const { currentUser } = useAuth();
     const [activeSection, setActiveSection] = useState('messaging');
     const [selectedUnitId, setSelectedUnitId] = useState(property.units && property.units.length > 0 ? property.units[0].id : null);
-    const [message, setMessage] = useState('');
-    const [chatHistory, setChatHistory] = useState([
-        { id: 1, sender: 'tenant', text: 'Hello, the AC in Unit 4 seems to be making a noise.', timestamp: '2026-01-24T10:00:00Z' },
-        { id: 2, sender: 'manager', text: 'Thank you for letting us know. We will send a technician tomorrow.', timestamp: '2026-01-24T14:30:00Z' }
-    ]);
+    const [messageText, setMessageText] = useState('');
+
+    // Hooks for Firestore data
+    const { messages, sendMessage, loading: messagesLoading } = useMessaging(property.id, selectedUnitId, currentUser?.id);
+    const { requests, createRequest, loading: requestsLoading } = useMaintenance(property.id, currentUser?.id);
 
     const selectedUnit = property.units?.find(u => u.id === selectedUnitId);
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!message.trim()) return;
+        if (!messageText.trim()) return;
 
-        const newMessage = {
-            id: Date.now(),
-            sender: 'manager',
-            text: message,
-            timestamp: new Date().toISOString()
-        };
-
-        setChatHistory([...chatHistory, newMessage]);
-        setMessage('');
+        await sendMessage(messageText, 'manager');
+        setMessageText('');
     };
 
     const renderMessaging = () => (
         <div style={{ display: 'flex', flexDirection: 'column', height: '350px' }}>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {chatHistory.map(msg => (
-                    <div
-                        key={msg.id}
-                        style={{
-                            alignSelf: msg.sender === 'manager' ? 'flex-end' : 'flex-start',
-                            maxWidth: '80%',
-                            padding: '10px 14px',
-                            borderRadius: msg.sender === 'manager' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
-                            background: msg.sender === 'manager' ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)',
-                            color: 'white',
-                            fontSize: '0.85rem',
-                            border: msg.sender === 'manager' ? 'none' : '1px solid var(--glass-border)'
-                        }}
-                    >
-                        {msg.text}
-                        <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {messagesLoading ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>Loading messages...</div>
+                ) : messages.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>No messages yet. Start a conversation!</div>
+                ) : (
+                    messages.map(msg => (
+                        <div
+                            key={msg.id}
+                            style={{
+                                alignSelf: msg.sender === 'manager' ? 'flex-end' : 'flex-start',
+                                maxWidth: '80%',
+                                padding: '10px 14px',
+                                borderRadius: msg.sender === 'manager' ? '16px 16px 2px 16px' : '16px 16px 16px 2px',
+                                background: msg.sender === 'manager' ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)',
+                                color: 'white',
+                                fontSize: '0.85rem',
+                                border: msg.sender === 'manager' ? 'none' : '1px solid var(--glass-border)'
+                            }}
+                        >
+                            {msg.text}
+                            <div style={{ fontSize: '0.65rem', opacity: 0.5, marginTop: '4px', textAlign: 'right' }}>
+                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
             <form onSubmit={handleSendMessage} style={{ display: 'flex', gap: '8px', padding: '12px', borderTop: '1px solid var(--glass-border)' }}>
                 <input
                     type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
+                    value={messageText}
+                    onChange={(e) => setMessageText(e.target.value)}
                     placeholder={t('tenantPortal.typeMessage')}
                     style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'white', padding: '12px', borderRadius: '12px', outline: 'none' }}
                 />
@@ -100,21 +103,30 @@ const TenantPortal = ({ property, transactions = [] }) => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h4 style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Active Requests</h4>
-                <button className="tag" style={{ background: 'var(--accent-primary)', border: 'none', color: 'white', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}>+ New</button>
+                <button
+                    onClick={() => createRequest({ title: 'New Maintenance Request', description: 'Sample issue report', unitId: selectedUnitId })}
+                    className="tag"
+                    style={{ background: 'var(--accent-primary)', border: 'none', color: 'white', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                    + New
+                </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {[
-                    { id: 101, title: 'AC Noise Issue', status: 'In Progress', date: '2026-01-24', priority: 'Medium' },
-                    { id: 102, title: 'Leaking Faucet', status: 'Pending', date: '2026-01-25', priority: 'Low' }
-                ].map(req => (
-                    <div key={req.id} className="glass-panel" style={{ padding: '14px', borderLeft: req.priority === 'High' ? '4px solid #F43F5E' : '4px solid var(--accent-warning)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                            <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{req.title}</div>
-                            <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', fontWeight: 800 }}>{req.status}</span>
+                {requestsLoading ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>Loading requests...</div>
+                ) : requests.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>No active requests.</div>
+                ) : (
+                    requests.map(req => (
+                        <div key={req.id} className="glass-panel" style={{ padding: '14px', borderLeft: req.priority === 'High' ? '4px solid #F43F5E' : '4px solid var(--accent-warning)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{req.title}</div>
+                                <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', fontWeight: 800 }}>{req.status}</span>
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Reported: {new Date(req.createdAt).toLocaleDateString()}</div>
                         </div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Reported: {req.date}</div>
-                    </div>
-                ))}
+                    ))
+                )}
             </div>
         </div>
     );

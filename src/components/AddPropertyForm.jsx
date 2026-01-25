@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import SideDrawer from './SideDrawer';
 import { HomeIcon, HotelIcon, OfficeIcon, BuildingIcon } from './Icons';
+import { validateForm } from '../utils/validators';
 
 const AddPropertyForm = ({ onSubmit, onClose }) => {
     const { t } = useLanguage();
     const [name, setName] = useState('');
     const [type, setType] = useState('rental');
     const [units, setUnits] = useState('1');
+    const [hasMultipleUnits, setHasMultipleUnits] = useState(false);
     const [address, setAddress] = useState('');
     const [purchasePrice, setPurchasePrice] = useState('');
     const [isUnderConstruction, setIsUnderConstruction] = useState(false);
 
+    const [errors, setErrors] = useState({});
+    const [touched, setTouched] = useState({});
+
+    // Validate form on every change
+    useEffect(() => {
+        const currentErrors = validateForm('property', {
+            name,
+            type,
+            units,
+            address,
+            marketValue: purchasePrice, // marketValue rule used for purchasePrice too
+            purchasePrice
+        });
+        setErrors(currentErrors);
+    }, [name, type, units, address, purchasePrice]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!name || !purchasePrice) return;
+        if (Object.keys(errors).length > 0) return;
 
         onSubmit({
             id: `prop-${Date.now()}`,
@@ -40,6 +58,18 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
         });
     };
 
+    const renderFieldError = (fieldName, value) => {
+        if ((!touched[fieldName] && !value) || !errors[fieldName]) return null;
+        return (
+            <div style={{ marginTop: '6px', animation: 'fadeIn 0.3s' }}>
+                <div style={{ color: '#F43F5E', fontSize: '0.75rem', fontWeight: 700 }}>⚠️ {t(errors[fieldName].message)}</div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '0.7rem', opacity: 0.7, marginTop: '2px' }}>{t(errors[fieldName].example)}</div>
+            </div>
+        );
+    };
+
+    const isFormValid = Object.keys(errors).length === 0;
+
     return (
         <SideDrawer
             isOpen={true}
@@ -57,20 +87,22 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     <input
                         type="text"
                         value={name}
+                        onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="e.g., 'Skyline Towers'"
-                        required
                         style={{
                             width: '100%',
                             padding: '14px',
                             background: 'rgba(0,0,0,0.2)',
-                            border: '1px solid var(--glass-border)',
+                            border: touched.name && errors.name ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)',
                             borderRadius: '12px',
                             color: 'white',
                             fontSize: '1rem',
-                            outline: 'none'
+                            outline: 'none',
+                            transition: 'border-color 0.2s'
                         }}
                     />
+                    {renderFieldError('name', name)}
                 </div>
 
                 <div style={{ marginBottom: '20px' }}>
@@ -154,27 +186,65 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     </div>
                 </div>
 
-                {(type === 'rental' || type === 'commercial') && (
+                {type === 'commercial' && (
                     <div style={{ marginBottom: '20px' }}>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                            {t('property.units')}
-                        </label>
-                        <input
-                            type="number"
-                            min="1"
-                            value={units}
-                            onChange={(e) => setUnits(e.target.value)}
-                            style={{
-                                width: '100%',
-                                padding: '14px',
-                                background: 'rgba(0,0,0,0.2)',
-                                border: '1px solid var(--glass-border)',
-                                borderRadius: '12px',
-                                color: 'white',
-                                fontSize: '1rem',
-                                outline: 'none'
-                            }}
-                        />
+                        <div style={{
+                            padding: '12px',
+                            background: 'rgba(255,255,255,0.03)',
+                            borderRadius: '12px',
+                            border: '1px solid var(--glass-border)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginBottom: hasMultipleUnits ? '16px' : '0'
+                        }} onClick={() => setHasMultipleUnits(!hasMultipleUnits)}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-secondary)' }}>
+                                {t('validation.multiUnitToggle')}
+                            </div>
+                            <div style={{
+                                width: '34px',
+                                height: '20px',
+                                background: hasMultipleUnits ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.1)',
+                                borderRadius: '10px',
+                                position: 'relative',
+                                cursor: 'pointer'
+                            }}>
+                                <div style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    background: 'white',
+                                    borderRadius: '50%',
+                                    position: 'absolute',
+                                    top: '3px',
+                                    left: hasMultipleUnits ? '17px' : '3px',
+                                    transition: 'left 0.2s'
+                                }} />
+                            </div>
+                        </div>
+
+                        {hasMultipleUnits && (
+                            <div style={{ marginTop: '16px', animation: 'fadeIn 0.3s' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                                    {t('property.units')}
+                                </label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    value={units}
+                                    onChange={(e) => setUnits(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        border: '1px solid var(--glass-border)',
+                                        borderRadius: '12px',
+                                        color: 'white',
+                                        fontSize: '1rem',
+                                        outline: 'none'
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -185,19 +255,21 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     <input
                         type="text"
                         value={address}
+                        onBlur={() => setTouched(prev => ({ ...prev, address: true }))}
                         onChange={(e) => setAddress(e.target.value)}
                         placeholder="Dubai Marina, UAE"
                         style={{
                             width: '100%',
                             padding: '14px',
                             background: 'rgba(0,0,0,0.2)',
-                            border: '1px solid var(--glass-border)',
+                            border: touched.address && errors.address ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)',
                             borderRadius: '12px',
                             color: 'white',
                             fontSize: '1rem',
                             outline: 'none'
                         }}
                     />
+                    {renderFieldError('address', address)}
                 </div>
 
                 <div style={{ marginBottom: '40px' }}>
@@ -207,22 +279,23 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     <input
                         type="number"
                         value={purchasePrice}
+                        onBlur={() => setTouched(prev => ({ ...prev, marketValue: true }))}
                         onChange={(e) => setPurchasePrice(e.target.value)}
                         placeholder="500000"
-                        required
                         style={{
                             width: '100%',
                             padding: '14px',
                             background: 'rgba(0,0,0,0.2)',
-                            border: '1px solid var(--glass-border)',
+                            border: touched.marketValue && errors.marketValue ? '1px solid rgba(244, 63, 94, 0.5)' : '1px solid var(--glass-border)',
                             borderRadius: '12px',
                             fontSize: '1.1rem',
                             fontWeight: 900,
                             fontFamily: 'var(--font-display)',
                             outline: 'none',
-                            color: 'var(--accent-success)'
+                            color: errors.marketValue ? 'var(--accent-danger)' : 'var(--accent-success)'
                         }}
                     />
+                    {renderFieldError('marketValue', purchasePrice)}
                 </div>
 
                 <div style={{ display: 'flex', gap: '16px' }}>
@@ -245,25 +318,43 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     >
                         {t('common.cancel')}
                     </button>
-                    <button
-                        type="submit"
-                        style={{
-                            flex: 1.5,
-                            padding: '18px',
-                            borderRadius: '16px',
-                            border: 'none',
-                            background: 'var(--gradient-primary)',
-                            color: 'white',
-                            fontWeight: 900,
-                            fontSize: '0.8rem',
-                            cursor: 'pointer',
-                            boxShadow: '0 15px 30px -10px rgba(99, 102, 241, 0.5)',
-                            textTransform: 'uppercase',
-                            letterSpacing: '1px'
-                        }}
-                    >
-                        {t('property.addBtn')}
-                    </button>
+                    <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {!isFormValid && (
+                            <div style={{
+                                animation: 'fadeIn 0.3s',
+                                background: 'rgba(244, 63, 94, 0.1)',
+                                padding: '8px 12px',
+                                borderRadius: '10px',
+                                border: '1px solid rgba(244, 63, 94, 0.2)',
+                                marginBottom: '4px'
+                            }}>
+                                {Object.values(errors).map((err, i) => (
+                                    <div key={i} style={{ color: '#F43F5E', fontSize: '0.65rem', fontWeight: 800 }}>• {t(err.message)}</div>
+                                ))}
+                            </div>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={!isFormValid}
+                            style={{
+                                width: '100%',
+                                padding: '18px',
+                                borderRadius: '16px',
+                                border: 'none',
+                                background: isFormValid ? 'var(--gradient-primary)' : 'rgba(255,255,255,0.05)',
+                                color: isFormValid ? 'white' : 'var(--text-secondary)',
+                                fontWeight: 900,
+                                fontSize: '0.8rem',
+                                cursor: isFormValid ? 'pointer' : 'not-allowed',
+                                boxShadow: isFormValid ? '0 15px 30px -10px rgba(99, 102, 241, 0.5)' : 'none',
+                                textTransform: 'uppercase',
+                                letterSpacing: '1px',
+                                transition: 'all 0.3s'
+                            }}
+                        >
+                            {isFormValid ? t('property.addBtn') : t('validation.fixErrors')}
+                        </button>
+                    </div>
                 </div>
             </form>
         </SideDrawer>

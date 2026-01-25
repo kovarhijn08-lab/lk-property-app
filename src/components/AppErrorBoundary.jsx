@@ -1,5 +1,5 @@
 import React from 'react';
-import * as Sentry from "@sentry/react";
+import { auth } from '../firebase/config';
 
 class AppErrorBoundary extends React.Component {
     constructor(props) {
@@ -13,8 +13,6 @@ class AppErrorBoundary extends React.Component {
     }
 
     componentDidCatch(error, errorInfo) {
-        // Log the error to Sentry
-        Sentry.captureException(error, { extra: errorInfo });
         console.error("Project Healer caught an error:", error, errorInfo);
         this.setState({ errorInfo });
     }
@@ -31,9 +29,8 @@ class AppErrorBoundary extends React.Component {
 
     render() {
         if (this.state.hasError) {
-            // Check if current user is admin (using Firebase Auth directly as we are outside hooks)
+            // Check if current user is admin
             const adminEmails = ['final_test_8812@example.com', 'admin@example.com', 'admintest@admin.ru'];
-            const { auth } = require('../firebase/config');
             const isAdmin = auth.currentUser && adminEmails.includes(auth.currentUser.email);
 
             if (!isAdmin) {
