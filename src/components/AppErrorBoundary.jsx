@@ -1,5 +1,6 @@
 import React from 'react';
 import { auth } from '../firebase/config';
+import { skynet } from '../utils/SkynetLogger';
 
 class AppErrorBoundary extends React.Component {
     constructor(props) {
@@ -15,6 +16,14 @@ class AppErrorBoundary extends React.Component {
     componentDidCatch(error, errorInfo) {
         console.error("Project Healer caught an error:", error, errorInfo);
         this.setState({ errorInfo });
+
+        // Report to global logs
+        skynet.log(`App Crash: ${error.message}`, 'crash', {
+            stack: error.stack,
+            componentStack: errorInfo?.componentStack,
+            userId: auth.currentUser?.uid,
+            email: auth.currentUser?.email
+        });
     }
 
     handleReset = () => {
