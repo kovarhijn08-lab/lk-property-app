@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useFirestoreCollection, firestoreOperations } from './useFirestore';
-import { where, or } from 'firebase/firestore';
+import { where, or, orderBy } from 'firebase/firestore';
 import { skynet } from '../utils/SkynetLogger';
 
 /**
@@ -20,7 +20,10 @@ export const useProperties = (user) => {
 
         // Owner/PMC/Admin: see properties they own (created by them)
         if (role === 'owner' || role === 'pmc' || role === 'admin') {
-            return [where('userId', '==', userId)];
+            return [
+                where('userId', '==', userId),
+                orderBy('updatedAt', 'desc')
+            ];
         }
 
 
@@ -30,12 +33,16 @@ export const useProperties = (user) => {
                 or(
                     where('tenantEmails', 'array-contains', user.email),
                     where('userId', '==', userId)
-                )
+                ),
+                orderBy('updatedAt', 'desc')
             ];
         }
 
         // Default: only their own
-        return [where('userId', '==', userId)];
+        return [
+            where('userId', '==', userId),
+            orderBy('updatedAt', 'desc')
+        ];
     }, [userId, role, user?.email]);
 
     /**
