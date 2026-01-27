@@ -72,11 +72,11 @@
 - [x] Исправить `useFirestore` (импорт `useMemo`).
 
 ### P1 — Надёжность и наблюдаемость
-- [ ] Сквозной аудит: единый формат логов (тип, entityId, actorId, severity).
-- [ ] Error boundary + отчёты: связать фронтенд‑ошибки с user/session.
-- [ ] Retry/backoff на критичных Firestore операциях.
+- [x] Сквозной аудит: единый формат логов (тип, entityId, actorId, severity).
+- [x] Error boundary + отчёты: связать фронтенд‑ошибки с user/session.
+- [x] Retry/backoff на критичных Firestore операциях.
 - [ ] Self‑healing: автоматическое восстановление при сбоях (safe‑mode, retry, авто‑фиксы, circuit breakers).
-- [ ] Стратегия бэкапа/экспорта данных (JSON/CSV).
+- [x] Стратегия бэкапа/экспорта данных (JSON/CSV).
 - [ ] Минимальные e2e сценарии (login → CRUD property → transaction → logout).
 
 ### P2 — Финансы и расчёты

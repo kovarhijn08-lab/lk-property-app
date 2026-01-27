@@ -1,23 +1,35 @@
 import React, { useState } from 'react';
 
-const Login = ({ onLogin, onSwitchToSignup }) => {
+const Login = ({ onLogin, onSwitchToSignup, onForgotPassword }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [successMsg, setSuccessMsg] = useState('');
     const [loading, setLoading] = useState(false);
+    const [isResetMode, setIsResetMode] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setSuccessMsg('');
         setLoading(true);
 
         try {
-            const result = await onLogin(email, password);
-            if (!result.success) {
-                setError(result.error);
+            if (isResetMode) {
+                const result = await onForgotPassword(email);
+                if (result.success) {
+                    setSuccessMsg('We sent a password reset link to your email.');
+                } else {
+                    setError(result.error);
+                }
+            } else {
+                const result = await onLogin(email, password);
+                if (!result.success) {
+                    setError(result.error);
+                }
             }
         } catch (err) {
-            console.error('Login submit error:', err);
+            console.error('Login/Reset error:', err);
             setError(err.message || 'An unexpected error occurred. Please try again.');
         } finally {
             setLoading(false);
@@ -49,7 +61,7 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                         WebkitTextFillColor: 'transparent'
                     }}>Smart Pocket Ledger</h1>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        Sign in to manage your properties
+                        {isResetMode ? 'Reset your password' : 'Sign in to manage your properties'}
                     </p>
                 </div>
 
@@ -64,6 +76,18 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                             fontSize: '0.85rem'
                         }}>
                             {error}
+                        </div>
+                    )}
+                    {successMsg && (
+                        <div style={{
+                            padding: '12px',
+                            borderRadius: '8px',
+                            background: 'rgba(16, 185, 129, 0.1)',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            color: '#10B981',
+                            fontSize: '0.85rem'
+                        }}>
+                            {successMsg}
                         </div>
                     )}
 
@@ -94,32 +118,52 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                         />
                     </div>
 
-                    <div>
-                        <label style={{
-                            display: 'block',
-                            marginBottom: '8px',
-                            fontSize: '0.85rem',
-                            color: 'var(--text-secondary)'
-                        }}>
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            placeholder="••••••••"
-                            style={{
-                                width: '100%',
-                                padding: '12px',
-                                borderRadius: '8px',
-                                border: '1px solid var(--glass-border)',
-                                background: 'rgba(255,255,255,0.05)',
-                                color: 'white',
-                                fontSize: '0.95rem'
-                            }}
-                        />
-                    </div>
+                    {!isResetMode && (
+                        <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                                <label style={{
+                                    fontSize: '0.85rem',
+                                    color: 'var(--text-secondary)'
+                                }}>
+                                    Password
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsResetMode(true);
+                                        setError('');
+                                        setSuccessMsg('');
+                                    }}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        padding: 0
+                                    }}
+                                >
+                                    Forgot?
+                                </button>
+                            </div>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                placeholder="••••••••"
+                                style={{
+                                    width: '100%',
+                                    padding: '12px',
+                                    borderRadius: '8px',
+                                    border: '1px solid var(--glass-border)',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    color: 'white',
+                                    fontSize: '0.95rem'
+                                }}
+                            />
+                        </div>
+                    )}
 
                     <button
                         type="submit"
@@ -137,28 +181,50 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                             transition: 'all 0.2s'
                         }}
                     >
-                        {loading ? 'Signing in...' : 'Sign In'}
+                        {loading ? 'Processing...' : (isResetMode ? 'Send Reset Link' : 'Sign In')}
                     </button>
 
-                    <div style={{ textAlign: 'center', marginTop: '8px' }}>
-                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                            Don't have an account?{' '}
-                        </span>
-                        <button
-                            type="button"
-                            onClick={onSwitchToSignup}
-                            style={{
-                                background: 'none',
-                                border: 'none',
-                                color: 'var(--accent-primary)',
-                                fontSize: '0.9rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                textDecoration: 'underline'
-                            }}
-                        >
-                            Sign Up
-                        </button>
+                    <div style={{ textAlign: 'center', marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        {isResetMode ? (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsResetMode(false);
+                                    setError('');
+                                    setSuccessMsg('');
+                                }}
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-secondary)',
+                                    fontSize: '0.9rem',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Back to Login
+                            </button>
+                        ) : (
+                            <div>
+                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                    Don't have an account?{' '}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={onSwitchToSignup}
+                                    style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: 'var(--accent-primary)',
+                                        fontSize: '0.9rem',
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        textDecoration: 'underline'
+                                    }}
+                                >
+                                    Sign Up
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </form>
             </div>

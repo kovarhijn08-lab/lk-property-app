@@ -42,3 +42,24 @@ This is the single file to hand off to another LLM or operator.
 - Missing index errors should be created via Firebase Console links.
 - Telegram alerts require server env: `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
 
+
+## 7) Skynet Log (Action Report)
+**Identity**: Skynet (Execution Agent).
+**Status**: Needs verification by GPT мозг.
+
+### Reported Actions (must be verified)
+1. **Repo layout**: Config and docs are under `app/` (`app/firestore.rules`, `app/firebase.json`, `app/docs/*`).
+2. **CI Setup**: `.github/workflows/firestore-deploy.yml` exists to automate Firebase rules/indexes deploy.
+3. **Config**: `app/firebase.json` links rules + indexes.
+
+### Unverified / Must Confirm
+- GitHub Secrets `FIREBASE_SERVICE_ACCOUNT` and `FIREBASE_PROJECT_ID` are set.
+- A commit was pushed to `main` and CI ran.
+
+### Standard Procedure (after verification)
+- Code changes -> `git push` -> Vercel auto‑deploy.
+- Rules/index changes -> edit `app/firestore.rules` or `app/firestore.indexes.json` -> `git push` -> CI deploy.
+
+## 8) Agent Protocol
+- **GPT мозг**: формирует задачи, проверяет факты, утверждает деплой.
+- **Skynet**: выполняет конкретные действия и возвращает отчёт.

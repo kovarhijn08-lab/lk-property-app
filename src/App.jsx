@@ -58,7 +58,7 @@ import UtilityChargeback from './components/UtilityChargeback'; // [NEW]
 function App() {
   const { t } = useLanguage(); // Ensure t is available
   // Firebase authentication (replacing mock localStorage auth)
-  const { currentUser, isGhostMode, actualUser, isAdmin, stopImpersonation, isAuthenticated, loading: authLoading, login, signup, logout } = useAuth();
+  const { currentUser, isGhostMode, actualUser, isAdmin, stopImpersonation, isAuthenticated, loading: authLoading, login, signup, logout, sendPasswordReset } = useAuth();
   const isMobile = useMobile();
 
   const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
@@ -278,7 +278,7 @@ function App() {
     if (authView === 'signup') {
       return <SignUp onSignup={signup} onSwitchToLogin={() => setAuthView('login')} />;
     }
-    return <Login onLogin={login} onSwitchToSignup={() => setAuthView('signup')} />;
+    return <Login onLogin={login} onForgotPassword={sendPasswordReset} onSwitchToSignup={() => setAuthView('signup')} />;
   }
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);

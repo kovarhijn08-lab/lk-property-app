@@ -37,3 +37,15 @@ This document is the single source of truth for how deployments and operations s
 - GitHub Actions: `.github/workflows/firestore-deploy.yml`
 - Triggers on changes to `firestore.rules`, `firestore.indexes.json`, or `firebase.json` in `main`.
 - Uses `FIREBASE_SERVICE_ACCOUNT` and `FIREBASE_PROJECT_ID` secrets.
+
+## 7) Backup / Export
+- Script: `app/scripts/export_firestore.cjs`
+- Output: `.tmp/exports/firestore_<timestamp>/*.json`
+- Usage:
+  ```bash
+  FIREBASE_SERVICE_ACCOUNT='{"..."}' node app/scripts/export_firestore.cjs
+  ```
+  Optional collections:
+  ```bash
+  FIREBASE_SERVICE_ACCOUNT='{"..."}' node app/scripts/export_firestore.cjs users properties
+  ```
