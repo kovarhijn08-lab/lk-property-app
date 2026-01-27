@@ -39,9 +39,9 @@ export const skynet = {
         }
 
         return {
-            actorId,
-            entityId,
-            entityType,
+            actorId: actorId || 'system',
+            entityId: entityId || null,
+            entityType: entityType || null,
             severity: meta.severity || severityMap[type] || 'info',
             source: meta.source || 'client',
             env: meta.env || import.meta.env.MODE

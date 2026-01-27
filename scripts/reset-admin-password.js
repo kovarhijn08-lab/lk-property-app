@@ -18,6 +18,11 @@ try {
         throw new Error('FIREBASE_SERVICE_ACCOUNT not found or format incorrect in .env.local');
     }
     serviceAccount = JSON.parse(match[1]);
+
+    // FIX: Handle escaped newlines in private key
+    if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
 } catch (e) {
     console.error('Failed to read credentials:', e.message);
     process.exit(1);
