@@ -43,10 +43,15 @@ const withRetry = async (fn, context, attempts = 3, baseDelayMs = 300) => {
             const delay = baseDelayMs * Math.pow(2, attempt) + jitter;
             skynet.warn('Firestore transient error, retrying', {
                 ...context,
-                error: error?.message,
-                code,
-                attempt: attempt + 1,
-                delay
+                action: 'db.retry',
+                entityType: context.collection,
+                entityId: context.docId,
+                metadata: {
+                    error: error?.message,
+                    code,
+                    attempt: attempt + 1,
+                    delay
+                }
             });
             await sleep(delay);
         }
@@ -168,11 +173,20 @@ export const firestoreOperations = {
                 updatedAt: serverTimestamp()
             }, { merge }), { action: 'set', collection: collectionName, docId });
 
-            skynet.success(`Document SET in ${collectionName}: ${docId}`, { collection: collectionName, docId });
+            skynet.success(`Document SET in ${collectionName}: ${docId}`, {
+                action: 'db.set',
+                entityType: collectionName,
+                entityId: docId
+            });
             return { success: true, id: docId };
         } catch (error) {
             console.error('Set document error:', error);
-            skynet.error(`FAILED SET in ${collectionName}: ${docId}`, { error: error.message, collection: collectionName });
+            skynet.error(`FAILED SET in ${collectionName}: ${docId}`, {
+                error: error.message,
+                action: 'db.set.fail',
+                entityType: collectionName,
+                entityId: docId
+            });
             return { success: false, error: error.message };
         }
     },
@@ -186,11 +200,20 @@ export const firestoreOperations = {
                 updatedAt: serverTimestamp()
             }), { action: 'update', collection: collectionName, docId });
 
-            skynet.success(`Document UPDATED in ${collectionName}: ${docId}`, { collection: collectionName, docId });
+            skynet.success(`Document UPDATED in ${collectionName}: ${docId}`, {
+                action: 'db.update',
+                entityType: collectionName,
+                entityId: docId
+            });
             return { success: true };
         } catch (error) {
             console.error('Update document error:', error);
-            skynet.error(`FAILED UPDATE in ${collectionName}: ${docId}`, { error: error.message, collection: collectionName });
+            skynet.error(`FAILED UPDATE in ${collectionName}: ${docId}`, {
+                error: error.message,
+                action: 'db.update.fail',
+                entityType: collectionName,
+                entityId: docId
+            });
             return { success: false, error: error.message };
         }
     },
@@ -201,11 +224,20 @@ export const firestoreOperations = {
             const docRef = doc(db, collectionName, docId);
             await withRetry(() => deleteDoc(docRef), { action: 'delete', collection: collectionName, docId });
 
-            skynet.success(`Document DELETED in ${collectionName}: ${docId}`, { collection: collectionName, docId });
+            skynet.success(`Document DELETED in ${collectionName}: ${docId}`, {
+                action: 'db.delete',
+                entityType: collectionName,
+                entityId: docId
+            });
             return { success: true };
         } catch (error) {
             console.error('Delete document error:', error);
-            skynet.error(`FAILED DELETE in ${collectionName}: ${docId}`, { error: error.message, collection: collectionName });
+            skynet.error(`FAILED DELETE in ${collectionName}: ${docId}`, {
+                error: error.message,
+                action: 'db.delete.fail',
+                entityType: collectionName,
+                entityId: docId
+            });
             return { success: false, error: error.message };
         }
     },

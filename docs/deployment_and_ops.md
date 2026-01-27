@@ -38,14 +38,42 @@ This document is the single source of truth for how deployments and operations s
 - Triggers on changes to `firestore.rules`, `firestore.indexes.json`, or `firebase.json` in `main`.
 - Uses `FIREBASE_SERVICE_ACCOUNT` and `FIREBASE_PROJECT_ID` secrets.
 
-## 7) Backup / Export
-- Script: `app/scripts/export_firestore.cjs`
-- Output: `.tmp/exports/firestore_<timestamp>/*.json`
-- Usage:
-  ```bash
-  FIREBASE_SERVICE_ACCOUNT='{"..."}' node app/scripts/export_firestore.cjs
-  ```
-  Optional collections:
-  ```bash
-  FIREBASE_SERVICE_ACCOUNT='{"..."}' node app/scripts/export_firestore.cjs users properties
-  ```
+## 11) Backup & Export Policy (P1.4)
+- **Schedule**: Weekly full Firestore export.
+- **Responsibility**: Admin / PMC.
+- **Storage**: Multi-provider (GDrive, S3, or physical encrypted drive).
+- **Verification**: Restoration test must be performed **once a month**.
+- **Execution**: 
+  - Use `app/scripts/export_firestore.cjs`.
+  - Ensure `FIREBASE_SERVICE_ACCOUNT` is set in the local/CI environment.
+## 8) Observability & Auditing (P1.1)
+- **Log Store**: Firestore `system_logs` collection.
+- **Mandatory Fields**: 
+  - `timestamp`: Unique ISO event time.
+  - `createdAt`: Database server time (for reconciliation).
+  - `actorId`: User ID or 'system'.
+  - `action`: Dot-separated action name (e.g., `auth.login`, `db.update`).
+  - `entityType` / `entityId`: Target resource (e.g., `property`, `user`).
+  - `env`: Environment name (`production`, `development`).
+  - `sessionId`: Persistent session identifier.
+- **Reporting**: Logs are viewable in the **Admin Dashboard -> Global Logs**.
+- **Alerts**: P0/Critical errors are automatically relayed to **Telegram** via `TelegramRelay`.
+
+## 9) Incident Classification & Retention (P1.2)
+- **Classification**:
+  - **P0 (Critical/Crash)**: Instant alert via Telegram. Retention: **90 days**.
+  - **P1 (Error)**: Daily audit required. Retention: **30 days**.
+  - **P2 (Info/Warn)**: General observability. Retention: **30 days**.
+- **Enforcement**:
+  - Every log entry includes `priority` and `expiresAt` fields.
+  - `expiresAt` is a Firestore-compatible Timestamp calculated at log time.
+
+## 10) Retry/Backoff Policy (P1.3)
+- **Automatic Retries**: Applied to all Firestore write operations (`set`, `update`, `delete`) and one-time reads (`get`, `list`).
+- **Policy**:
+  - **Attempts**: 3.
+  - **Strategy**: Exponential backoff with jitter.
+  - **Retryable Errors**: `unavailable`, `aborted`, `deadline-exceeded`, `resource-exhausted`.
+- **User Notification**:
+  - If an operation fails after 3 attempts, a structured log is recorded with `action: *.fail`.
+  - The UI (App.jsx) displays an error Toast with the failure reason.

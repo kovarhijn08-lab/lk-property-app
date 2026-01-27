@@ -286,9 +286,14 @@ function App() {
 
   // CRUD Operations
   const addProperty = async (newProp) => {
-    await addPropertyToFirestore(newProp);
-    setSelectedPropertyId(newProp.id);
-    setShowAddPropertyForm(false);
+    const response = await addPropertyToFirestore(newProp);
+    if (response.success) {
+      setSelectedPropertyId(newProp.id);
+      setShowAddPropertyForm(false);
+      setToast({ message: 'Объект успешно создан! ✨', type: 'success' });
+    } else {
+      setToast({ message: `Ошибка создания: ${response.error}`, type: 'error' });
+    }
   };
 
   const addTransaction = async (tx) => {
@@ -313,15 +318,18 @@ function App() {
 
     const updatedTransactions = [...(targetProperty.transactions || []), ...newTransactions];
 
-    // Use the updateProperty hook wrapper instead of direct firestoreOperations
-    await updatePropertyInFirestore(targetPropertyId, {
+    const response = await updatePropertyInFirestore(targetPropertyId, {
       ...targetProperty,
       transactions: updatedTransactions
     });
 
-    setToast({ message: `Успешно! Записано ${newTransactions.length} поз. ✨`, type: 'success' });
-    setShowTransactionForm(false);
-    setPrefilledTransactionData(null);
+    if (response.success) {
+      setToast({ message: `Успешно! Записано ${newTransactions.length} поз. ✨`, type: 'success' });
+      setShowTransactionForm(false);
+      setPrefilledTransactionData(null);
+    } else {
+      setToast({ message: `Ошибка при записи: ${response.error}`, type: 'error' });
+    }
   };
 
   const handleSmartAction = (actionType, data, taskId) => {
@@ -431,10 +439,13 @@ function App() {
   const deleteContract = async (contractId) => {
     if (!selectedProperty) return;
     const updatedContracts = (selectedProperty.contracts || []).filter(c => c.id !== contractId);
-    await updatePropertyInFirestore(selectedPropertyId, {
+    const response = await updatePropertyInFirestore(selectedPropertyId, {
       ...selectedProperty,
       contracts: updatedContracts
     });
+    if (!response.success) {
+      setToast({ message: `Ошибка удаления договора: ${response.error}`, type: 'error' });
+    }
   };
 
   const handleLeaseScanComplete = async (data) => {
@@ -454,11 +465,16 @@ function App() {
     const updatedContracts = (selectedProperty.contracts || []).map(c =>
       c.id === contractId ? { ...c, signature: signatureData, status: 'signed' } : c
     );
-    await updatePropertyInFirestore(selectedPropertyId, {
+    const response = await updatePropertyInFirestore(selectedPropertyId, {
       ...selectedProperty,
       contracts: updatedContracts
     });
-    setToast({ message: 'Договор успешно подписан!', type: 'success' });
+
+    if (response.success) {
+      setToast({ message: 'Договор успешно подписан!', type: 'success' });
+    } else {
+      setToast({ message: `Ошибка подписания: ${response.error}`, type: 'error' });
+    }
   };
 
   // Metrics Calculation

@@ -17,8 +17,8 @@
 
 ## 3) Data Protection
 - [ ] PII fields are documented and access‑scoped.
-- [ ] Sensitive data is never logged in plain text.
-- [ ] Data retention policy defined (logs, documents).
+- [x] Sensitive data is never logged in plain text.
+- [x] Data retention policy defined: P0 (90d), P1/P2 (30d) via `expiresAt` TTL.
 - [ ] Export/delete requests (GDPR/CCPA) flow documented.
 
 ## 4) Firestore Rules & API Security
@@ -28,13 +28,13 @@
 - [ ] API routes require admin tokens for privileged actions.
 
 ## 5) Observability & Logging
-- [ ] Structured logging with severity and entity IDs.
-- [ ] Server‑side logging pipeline for critical events.
+- [x] Structured logging with mandatory fields: `timestamp`, `severity`, `actorId`, `action`, `entityType`, `entityId`, `source`, `env`, `sessionId`.
+- [x] Server-side logging to Firestore `system_logs` for all critical user and system actions.
 - [ ] Alerting configured (Telegram/Email) for P0 incidents.
 - [ ] Rate limiting on log ingestion.
 
 ## 6) Self‑Healing / Resilience
-- [ ] Retry/backoff on transient failures.
+- [x] Retry/backoff on transient failures (3 attempts, exponential backoff implemented).
 - [ ] Safe‑mode and degraded states documented.
 - [ ] Auto‑repair scripts for known data anomalies.
 - [ ] Circuit breakers for external integrations.

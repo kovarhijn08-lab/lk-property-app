@@ -39,7 +39,13 @@ export const AuthProvider = ({ children }) => {
                     if (snapshot.exists()) {
                         const userData = snapshot.data();
                         console.log(`[Auth] User document updated for ${user.email} (Role: ${userData.role})`);
-                        skynet.info(`Auth profile updated: ${user.email}`, { userId: user.uid, role: userData.role });
+                        skynet.info(`Auth profile updated: ${user.email}`, {
+                            actorId: user.uid,
+                            action: 'user.profile.update',
+                            entityType: 'user',
+                            entityId: user.uid,
+                            role: userData.role
+                        });
 
                         setCurrentUser({
                             id: user.uid,
@@ -81,7 +87,12 @@ export const AuthProvider = ({ children }) => {
         try {
             const res = await signInWithEmailAndPassword(auth, email, password);
 
-            skynet.log(`User logged in: ${res.user.email}`, 'info', { userId: res.user.uid, type: 'auth_login' });
+            skynet.log(`User logged in: ${res.user.email}`, 'info', {
+                actorId: res.user.uid,
+                action: 'auth.login',
+                entityType: 'user',
+                entityId: res.user.uid
+            });
             return { success: true, user: res.user };
         } catch (error) {
             console.error('[AuthContext] Login Error:', error);
@@ -105,14 +116,22 @@ export const AuthProvider = ({ children }) => {
             createdAt: new Date().toISOString(),
             preferences: { currency: 'USD', isDemoMode: false }
         });
-        skynet.log(`New user registered: ${email} as tenant`, 'success', { userId: res.user.uid, type: 'auth_signup' });
+        skynet.log(`New user registered: ${email} as tenant`, 'success', {
+            actorId: res.user.uid,
+            action: 'auth.signup',
+            entityType: 'user',
+            entityId: res.user.uid
+        });
         return { success: true, user: res.user };
     };
 
     const logout = async () => {
         const email = auth.currentUser?.email;
         await signOut(auth);
-        skynet.log(`User logged out: ${email}`, 'info', { type: 'auth_logout' });
+        skynet.log(`User logged out: ${email}`, 'info', {
+            actorId: auth.currentUser?.uid || 'unknown',
+            action: 'auth.logout'
+        });
         setGhostUser(null);
         return { success: true };
     };
@@ -128,7 +147,12 @@ export const AuthProvider = ({ children }) => {
     const impersonate = (user) => {
         if (!isPMC) return;
         setGhostUser(user);
-        skynet.log(`Admin began impersonating ${user.email}`, 'warning', { adminId: currentUser.id, targetUserId: user.id });
+        skynet.log(`Admin began impersonating ${user.email}`, 'warning', {
+            actorId: currentUser.id,
+            action: 'auth.impersonate',
+            entityType: 'user',
+            entityId: user.id
+        });
     };
 
     const stopImpersonation = () => {
@@ -175,7 +199,11 @@ export const AuthProvider = ({ children }) => {
         sendPasswordReset: async (email) => {
             try {
                 await sendPasswordResetEmail(auth, email);
-                skynet.log(`Password reset email sent to: ${email}`, 'info');
+                skynet.log(`Password reset email sent to: ${email}`, 'info', {
+                    actorId: currentUser?.id || 'system',
+                    action: 'user.password.reset',
+                    metadata: { targetEmail: email }
+                });
                 return { success: true };
             } catch (error) {
                 console.error('Password reset error:', error);

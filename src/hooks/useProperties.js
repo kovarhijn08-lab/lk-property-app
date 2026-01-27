@@ -64,9 +64,10 @@ export const useProperties = (user) => {
 
         if (response.success) {
             skynet.log(`New property created: "${newProperty.name}"`, 'success', {
-                userId,
-                propertyId: newProperty.id,
-                type: 'property_creation'
+                actorId: userId,
+                action: 'property.create',
+                entityType: 'property',
+                entityId: newProperty.id
             });
         }
 
@@ -86,9 +87,10 @@ export const useProperties = (user) => {
             const currentDoc = await firestoreOperations.getDocument('properties', propertyId);
             if (currentDoc.success) {
                 await skynet.log(`Snapshot created for "${propertyId}"`, 'info', {
-                    type: 'snapshot',
-                    collection: 'properties',
-                    docId: propertyId,
+                    actorId: userId,
+                    action: 'property.update.snapshot',
+                    entityType: 'property',
+                    entityId: propertyId,
                     data: currentDoc.data
                 });
             }
@@ -107,9 +109,10 @@ export const useProperties = (user) => {
 
         if (response.success) {
             skynet.log(`Property updated: "${propertyId}"`, 'info', {
-                userId,
-                propertyId,
-                type: 'property_update'
+                actorId: userId,
+                action: 'property.update',
+                entityType: 'property',
+                entityId: propertyId
             });
         }
 
@@ -129,9 +132,10 @@ export const useProperties = (user) => {
             const currentDoc = await firestoreOperations.getDocument('properties', propertyId);
             if (currentDoc.success) {
                 await skynet.log(`Delete snapshot for "${propertyId}"`, 'warning', {
-                    type: 'deletion_snapshot',
-                    collection: 'properties',
-                    docId: propertyId,
+                    actorId: userId,
+                    action: 'property.delete.snapshot',
+                    entityType: 'property',
+                    entityId: propertyId,
                     data: currentDoc.data
                 });
             }
@@ -146,9 +150,10 @@ export const useProperties = (user) => {
 
         if (response.success) {
             skynet.log(`Property deleted: "${propertyId}"`, 'warning', {
-                userId,
-                propertyId,
-                type: 'property_deletion'
+                actorId: userId,
+                action: 'property.delete',
+                entityType: 'property',
+                entityId: propertyId
             });
         }
 
