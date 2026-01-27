@@ -114,7 +114,6 @@
 ---
 
 # ✅ Деплой (информация для Skynet)
-- CLI в этом окружении нет.
 - Фронтенд деплоится через push в `main` (Vercel).
 - Firestore rules деплоятся GitHub Action.
 - Всё подробно: `app/docs/deployment_handover_checklist.md`

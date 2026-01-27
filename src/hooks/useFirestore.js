@@ -99,29 +99,20 @@ export const useFirestoreDoc = (collectionName, docId) => {
  * Hook for real-time Firestore collection
  * Supports queries and real-time updates
  */
-export const useFirestoreCollection = (collectionName, queryConstraints = []) => {
+export const useFirestoreCollection = (collectionName, queryConstraints = [], dependencies = []) => {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Use a composite key for dependencies to ensure re-subscription when query parameters 
-    // or the underlying user/context (tracked via queryConstraints) change.
+    // Composite key for situations where explicit dependencies aren't provided
     const queryKey = useMemo(() => {
-        try {
-            return JSON.stringify(queryConstraints, (key, value) => {
-                // Handle complex Firestore internal structures that normally don't stringify well
-                if (value && typeof value === 'object') {
-                    if (value._query) return value._query.path.segments.join('/');
-                    if (value.type && (value.type === 'where' || value.type === 'orderBy')) {
-                        return `${value.type}-${value._field?.segments?.join('.')}-${JSON.stringify(value._value)}`;
-                    }
-                }
-                return value;
-            });
-        } catch (e) {
-            return Math.random(); // Fallback to force update if stringify fails
-        }
-    }, [queryConstraints]);
+        if (dependencies.length > 0) return JSON.stringify(dependencies);
+
+        return JSON.stringify(queryConstraints.map(c => {
+            if (c._query) return c._query.path.segments.join('/');
+            return 'constraint';
+        }));
+    }, [collectionName, ...dependencies, queryConstraints]);
 
     useEffect(() => {
         if (!collectionName) {
@@ -135,6 +126,7 @@ export const useFirestoreCollection = (collectionName, queryConstraints = []) =>
             : collectionRef;
 
         setLoading(true);
+        console.log(`[Firestore] Subscribing to ${collectionName}...`, { dependencies });
 
         // Real-time listener
         const unsubscribe = onSnapshot(q,
@@ -143,17 +135,21 @@ export const useFirestoreCollection = (collectionName, queryConstraints = []) =>
                     id: doc.id,
                     ...doc.data()
                 }));
+                console.log(`[Firestore] ${collectionName} update: ${items.length} items found.`);
                 setData(items);
                 setLoading(false);
             },
             (err) => {
-                console.error('Firestore collection error:', err);
+                console.error(`Firestore collection error (${collectionName}):`, err);
                 setError(err.message);
                 setLoading(false);
             }
         );
 
-        return () => unsubscribe();
+        return () => {
+            console.log(`[Firestore] Unsubscribing from ${collectionName}.`);
+            unsubscribe();
+        };
     }, [collectionName, queryKey]);
 
     return { data, loading, error };

@@ -7,7 +7,7 @@ import { skynet } from '../utils/SkynetLogger';
  * Хук для работы с properties через Firestore
  * Заменяет useLocalStorage для properties
  * 
- * @param {string} userId - ID авторизованного пользователя
+ * @param {Object} user - объект авторизованного пользователя из AuthContext
  * @returns {Object} - properties, loading, и CRUD методы
  */
 export const useProperties = (user) => {
@@ -20,9 +20,11 @@ export const useProperties = (user) => {
 
         // Owner/PMC/Admin: see properties they own (created by them)
         if (role === 'owner' || role === 'pmc' || role === 'admin') {
-            return [where('userId', '==', userId)];
+            return [
+                where('userId', '==', userId),
+                orderBy('updatedAt', 'desc')
+            ];
         }
-
 
         // Tenant: see properties where they are registered OR where they are the creator (fallback)
         if (role === 'tenant') {
@@ -30,12 +32,16 @@ export const useProperties = (user) => {
                 or(
                     where('tenantEmails', 'array-contains', user.email),
                     where('userId', '==', userId)
-                )
+                ),
+                orderBy('updatedAt', 'desc')
             ];
         }
 
         // Default: only their own
-        return [where('userId', '==', userId)];
+        return [
+            where('userId', '==', userId),
+            orderBy('updatedAt', 'desc')
+        ];
     }, [userId, role, user?.email]);
 
     /**
@@ -153,9 +159,11 @@ export const useProperties = (user) => {
     };
 
     // Загрузка properties пользователя из Firestore с real-time обновлениями
+    // Передаем зависимости [userId, role, user?.email] для корректного переподключения
     const { data: properties, loading, error } = useFirestoreCollection(
         userId ? 'properties' : null,
-        queryConstraints
+        queryConstraints,
+        [userId, role, user?.email]
     );
 
     return {
