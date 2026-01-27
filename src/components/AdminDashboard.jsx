@@ -2,19 +2,29 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { firestoreOperations } from '../hooks/useFirestore';
 import { collection, getDocs, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { validateForm } from '../utils/validators';
 import { runGlobalDiagnostics, autoFixProperty, runUserDiagnostics } from '../utils/DiagnosticsManager';
 import { useLanguage } from '../context/LanguageContext';
 
 import { skynet } from '../utils/SkynetLogger';
+import { useAllChats } from '../hooks/useAllChats';
+import SupportChat from './SupportChat';
 
 const AdminDashboard = ({ onClose }) => {
-    const { currentUser, actualUser, impersonate, isGhostMode, stopImpersonation } = useAuth();
+    const { currentUser, actualUser, impersonate, isGhostMode, stopImpersonation, sendPasswordReset } = useAuth();
 
     const [activeTab, setActiveTab] = useState('overview'); // vercel-style tabs
+    const { chats: allChats } = useAllChats();
+    const [selectedSupportUserId, setSelectedSupportUserId] = useState(null);
+    const [editingUser, setEditingUser] = useState(null); // [NEW] for inline editing
+    const [editForm, setEditForm] = useState({ name: '', email: '' });
+    const [pwResetTarget, setPwResetTarget] = useState(null); // [NEW] target user for manual pw reset
+    const [newPassForm, setNewPassForm] = useState(''); // [NEW] new password state
+    const [isUpdatingPass, setIsUpdatingPass] = useState(false);
     const [users, setUsers] = useState([]);
     const [persistentLogs, setPersistentLogs] = useState([]);
+    const [pendingRoleChanges, setPendingRoleChanges] = useState({}); // [NEW] Track unsaved role changes
     const [activityFeed, setActivityFeed] = useState([]);
     const [systemHealth, setSystemHealth] = useState({
         dbConnected: 'unknown',
@@ -35,10 +45,10 @@ const AdminDashboard = ({ onClose }) => {
     const [loading, setLoading] = useState(false);
 
     const isAdmin = (
-        currentUser?.email === 'final_test_8812@example.com' ||
-        currentUser?.email === 'admin@example.com' ||
-        currentUser?.email === 'admintest@admin.ru'
-    ) || currentUser?.role === 'admin';
+        actualUser?.email === 'final_test_8812@example.com' ||
+        actualUser?.email === 'admin@example.com' ||
+        actualUser?.email === 'admintest@admin.ru'
+    ) || actualUser?.role === 'admin';
 
     const sendHello = async () => {
         try {
@@ -91,8 +101,8 @@ const AdminDashboard = ({ onClose }) => {
                     history: [...prev.history, { time: new Date().toLocaleTimeString(), value: latency }].slice(-10)
                 }));
 
-                // Log significant latency issues
-                if (latency > 500) {
+                // Log significant latency issues (Threshold increased to 2000ms to reduce noise)
+                if (latency > 2000) {
                     skynet.log(`High Latency Detected: ${latency}ms`, 'warning', {
                         userId: currentUser?.id,
                         latency,
@@ -247,6 +257,56 @@ const AdminDashboard = ({ onClose }) => {
         }
     };
 
+    /**
+     * [NEW] Ручная смена пароля через API
+     */
+    const handleManualPasswordReset = async () => {
+        if (!pwResetTarget || !newPassForm) return;
+        if (newPassForm.length < 6) return alert('Password too short (min 6 chars)');
+
+        setIsUpdatingPass(true);
+        console.log('Attempting manual password reset for:', pwResetTarget.email);
+
+        try {
+            const idToken = await auth.currentUser.getIdToken();
+            console.log('ID Token obtained');
+
+            const response = await fetch('/api/admin/set-password', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({
+                    targetUid: pwResetTarget.id,
+                    newPassword: newPassForm
+                })
+            });
+
+            console.log('Server response status:', response.status);
+            const data = await response.json();
+
+            if (response.ok) {
+                alert('Password updated successfully!');
+                skynet.log(`Admin manually changed password for ${pwResetTarget.email}`, 'warning');
+                setPwResetTarget(null);
+                setNewPassForm('');
+            } else {
+                throw new Error(data.error || 'Server error');
+            }
+        } catch (err) {
+            console.error('Manual Reset Error:', err);
+            // [NEW] Log the error to Global Logs so the user sees it even if backend crashes
+            skynet.log(`Manual Reset Error: ${err.message}`, 'error', {
+                target: pwResetTarget?.email,
+                caller: actualUser?.email || currentUser?.email
+            });
+            alert('Failed to update password: ' + err.message);
+        } finally {
+            setIsUpdatingPass(false);
+        }
+    };
+
     // Real-time Users Observation
     useEffect(() => {
         if (!isAdmin) return;
@@ -338,11 +398,50 @@ const AdminDashboard = ({ onClose }) => {
                 <VercelTab id="diagnostics" label={t('admin.tabs.diagnostics')} />
                 <VercelTab id="users" label={t('admin.tabs.users')} />
                 <VercelTab id="activity" label="Activity Feed" />
+                <VercelTab id="support" label="Support" />
                 <VercelTab id="logs" label="Global Logs" />
             </nav>
 
             {/* Content Area */}
             <main style={{ padding: '32px 24px', maxWidth: '1000px', margin: '0 auto' }}>
+
+                {activeTab === 'support' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: selectedSupportUserId ? '300px 1fr' : '1fr', gap: '20px', minHeight: '600px' }}>
+                        <div className="glass-panel" style={{ background: '#111', padding: '16px', border: '1px solid #333', borderRadius: '12px', overflowY: 'auto' }}>
+                            <h2 style={{ fontSize: '1.2rem', marginTop: 0, marginBottom: '20px' }}>Active Support</h2>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                {allChats.filter(c => c.isSupport).length === 0 ? (
+                                    <div style={{ color: '#555', textAlign: 'center', padding: '20px' }}>No support requests yet.</div>
+                                ) : (
+                                    allChats.filter(c => c.isSupport).map(chat => (
+                                        <div
+                                            key={chat.id}
+                                            onClick={() => setSelectedSupportUserId(chat.userId)}
+                                            style={{
+                                                padding: '12px',
+                                                background: selectedSupportUserId === chat.userId ? 'rgba(59, 130, 246, 0.1)' : '#1a1a1a',
+                                                border: `1px solid ${selectedSupportUserId === chat.userId ? '#3B82F6' : '#222'}`,
+                                                borderRadius: '8px',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'white' }}>User: {chat.userId?.substring(0, 8)}...</div>
+                                            <div style={{ fontSize: '0.75rem', color: '#666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: '4px' }}>
+                                                {chat.lastMessage.text}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                        {selectedSupportUserId && (
+                            <div className="glass-panel" style={{ background: '#000', border: '1px solid #333', borderRadius: '12px', overflow: 'hidden' }}>
+                                <SupportChat isInline targetUserId={selectedSupportUserId} onClose={() => setSelectedSupportUserId(null)} />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {activeTab === 'overview' && (
                     <div className="tab-content">
@@ -483,54 +582,242 @@ const AdminDashboard = ({ onClose }) => {
                                 <tr>
                                     <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>User</th>
                                     <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Email</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Role</th>
                                     <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Registered</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Last Login</th>
                                     <th style={{ padding: '12px 20px', textAlign: 'right', borderBottom: '1px solid #333' }}>Actions</th>
 
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map(user => (
-                                    <tr key={user.id} style={{ borderBottom: '1px solid #222' }}>
-                                        <td style={{ padding: '12px 20px' }}>{user.name}</td>
-                                        <td style={{ padding: '12px 20px', color: '#888' }}>{user.email}</td>
-                                        <td style={{ padding: '12px 20px', color: '#888' }}>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
-                                        <td style={{ padding: '12px 20px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                                            <button
-                                                onClick={async () => {
-                                                    const newRole = user.role === 'admin' ? 'user' : 'admin';
-                                                    if (window.confirm(`Change ${user.email} role to ${newRole}?`)) {
-                                                        await firestoreOperations.updateDocument('users', user.id, { role: newRole });
-                                                        skynet.log(`Admin changed role of ${user.email} to ${newRole}`, 'warning');
-                                                    }
-                                                }}
-                                                className="tag"
-                                                style={{
-                                                    background: user.role === 'admin' ? 'var(--accent-danger)' : 'rgba(255,255,255,0.1)',
-                                                    border: '1px solid var(--glass-border)',
-                                                    cursor: 'pointer',
-                                                    color: 'white',
-                                                    fontSize: '0.65rem'
-                                                }}
-                                            >
-                                                {user.role === 'admin' ? 'REVOKE ADMIN' : 'MAKE ADMIN'}
-                                            </button>
-                                            <button
-                                                onClick={() => { impersonate(user); onClose(); }}
-                                                className="tag"
-                                                style={{
-                                                    background: currentUser.id === user.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
-                                                    border: '1px solid var(--glass-border)',
-                                                    cursor: 'pointer',
-                                                    color: 'white',
-                                                    fontSize: '0.65rem'
-                                                }}
-                                            >
-                                                {currentUser.id === user.id ? 'EYE ACTIVE' : 'IMPERSONATE'}
-                                            </button>
-                                        </td>
+                                {users.map(user => {
+                                    const isEditing = editingUser?.id === user.id;
 
-                                    </tr>
-                                ))}
+                                    return (
+                                        <tr key={user.id} style={{ borderBottom: '1px solid #222', background: isEditing ? 'rgba(59, 130, 246, 0.05)' : 'transparent' }}>
+                                            <td style={{ padding: '12px 20px' }}>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="text"
+                                                        value={editForm.name}
+                                                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                                                        style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '4px 8px', borderRadius: '4px', width: '100%' }}
+                                                    />
+                                                ) : user.name}
+                                            </td>
+                                            <td style={{ padding: '12px 20px', color: '#888' }}>
+                                                {isEditing ? (
+                                                    <input
+                                                        type="email"
+                                                        value={editForm.email}
+                                                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                                        style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '4px 8px', borderRadius: '4px', width: '100%' }}
+                                                    />
+                                                ) : user.email}
+                                            </td>
+                                            <td style={{ padding: '12px 20px' }}>
+                                                <span className="tag" style={{
+                                                    background: user.role === 'admin' ? 'rgba(239, 68, 68, 0.1)' :
+                                                        user.role === 'pmc' ? 'rgba(59, 130, 246, 0.1)' :
+                                                            user.role === 'owner' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                    color: user.role === 'admin' ? '#EF4444' :
+                                                        user.role === 'pmc' ? '#3B82F6' :
+                                                            user.role === 'owner' ? '#10B981' : '#888',
+                                                    border: `1px solid ${user.role === 'admin' ? '#EF4444' : user.role === 'pmc' ? '#3B82F6' : user.role === 'owner' ? '#10B981' : '#333'}`,
+                                                    fontSize: '0.65rem',
+                                                    textTransform: 'uppercase'
+                                                }}>
+                                                    {user.role || 'user'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px 20px', color: '#888' }}>{user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}</td>
+                                            <td style={{ padding: '12px 20px', color: '#888' }}>
+                                                {user.lastLogin ? new Date(user.lastLogin).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Never'}
+                                            </td>
+                                            <td style={{ padding: '12px 20px', textAlign: 'right', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                                {isEditing ? (
+                                                    <>
+                                                        <button
+                                                            onClick={async () => {
+                                                                try {
+                                                                    const idToken = await auth.currentUser.getIdToken();
+                                                                    const response = await fetch('/api/admin/update-user', {
+                                                                        method: 'POST',
+                                                                        headers: {
+                                                                            'Content-Type': 'application/json',
+                                                                            'Authorization': `Bearer ${idToken}`
+                                                                        },
+                                                                        body: JSON.stringify({
+                                                                            targetUid: user.id,
+                                                                            newEmail: editForm.email,
+                                                                            newName: editForm.name
+                                                                        })
+                                                                    });
+
+                                                                    const res = await response.json();
+
+                                                                    if (response.ok) {
+                                                                        skynet.log(`Admin synchronized user update: ${user.email} -> ${editForm.email}`, 'info');
+                                                                        setEditingUser(null);
+                                                                    } else {
+                                                                        alert('Update failed: ' + res.error);
+                                                                        skynet.log(`Failed to sync user info: ${res.error}`, 'error');
+                                                                    }
+                                                                } catch (err) {
+                                                                    alert('Update failed: ' + err.message);
+                                                                    console.error('Profile sync error:', err);
+                                                                }
+                                                            }}
+                                                            className="tag"
+                                                            style={{ background: 'var(--accent-primary)', border: 'none', color: 'white', cursor: 'pointer', fontSize: '0.65rem' }}
+                                                        >
+                                                            SAVE
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setEditingUser(null)}
+                                                            className="tag"
+                                                            style={{ background: '#333', border: '1px solid #444', color: 'white', cursor: 'pointer', fontSize: '0.65rem' }}
+                                                        >
+                                                            CANCEL
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <select
+                                                                value={pendingRoleChanges[user.id] || user.role || 'user'}
+                                                                onChange={(e) => {
+                                                                    const newRole = e.target.value;
+                                                                    setPendingRoleChanges(prev => ({
+                                                                        ...prev,
+                                                                        [user.id]: newRole
+                                                                    }));
+                                                                    skynet.info(`Admin selected new role for ${user.email}`, { targetUid: user.id, role: newRole });
+                                                                }}
+                                                                style={{
+                                                                    background: '#222',
+                                                                    border: '1px solid var(--glass-border)',
+                                                                    borderRadius: '4px',
+                                                                    color: 'white',
+                                                                    fontSize: '0.65rem',
+                                                                    padding: '4px 8px',
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                <option value="user">Standard User</option>
+                                                                <option value="pmc">Property Manager (PMC)</option>
+                                                                <option value="owner">Investor (Owner)</option>
+                                                                <option value="tenant">Resident (Tenant)</option>
+                                                                <option value="admin">Global Admin</option>
+                                                            </select>
+
+                                                            {pendingRoleChanges[user.id] && pendingRoleChanges[user.id] !== user.role && (
+                                                                <button
+                                                                    onClick={async () => {
+                                                                        const newRole = pendingRoleChanges[user.id];
+                                                                        skynet.info(`Admin saving role change for ${user.email}`, { targetUid: user.id, to: newRole });
+
+                                                                        try {
+                                                                            const idToken = await auth.currentUser.getIdToken();
+                                                                            const response = await fetch('/api/admin/update-user', {
+                                                                                method: 'POST',
+                                                                                headers: {
+                                                                                    'Content-Type': 'application/json',
+                                                                                    'Authorization': `Bearer ${idToken}`
+                                                                                },
+                                                                                body: JSON.stringify({
+                                                                                    targetUid: user.id,
+                                                                                    newRole: newRole
+                                                                                })
+                                                                            });
+
+                                                                            const res = await response.json();
+
+                                                                            if (response.ok) {
+                                                                                skynet.success(`Role updated via API for ${user.email}`, { targetUid: user.id, role: newRole });
+                                                                                setPendingRoleChanges(prev => {
+                                                                                    const next = { ...prev };
+                                                                                    delete next[user.id];
+                                                                                    return next;
+                                                                                });
+                                                                                alert('Success!');
+                                                                            } else {
+                                                                                skynet.error(`API Role update failed for ${user.email}`, { error: res.error });
+                                                                                alert('Error: ' + res.error);
+                                                                            }
+                                                                        } catch (err) {
+                                                                            skynet.error(`Connection error during role update`, { error: err.message });
+                                                                            alert('Connection failed');
+                                                                        }
+                                                                    }}
+                                                                    style={{
+                                                                        background: 'var(--accent-success)',
+                                                                        border: 'none',
+                                                                        color: 'white',
+                                                                        padding: '4px 8px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '0.6rem',
+                                                                        cursor: 'pointer',
+                                                                        fontWeight: 800,
+                                                                        animation: 'pulse 2s infinite'
+                                                                    }}
+                                                                >
+                                                                    SAVE
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (window.confirm(`Send password reset email to ${user.email}?`)) {
+                                                                    const res = await sendPasswordReset(user.email);
+                                                                    if (res.success) alert('Reset email sent!');
+                                                                    else alert('Error: ' + res.error);
+                                                                }
+                                                            }}
+                                                            className="tag"
+                                                            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6', cursor: 'pointer', color: '#3B82F6', fontSize: '0.65rem' }}
+                                                        >
+                                                            RESET EMAIL
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                console.log('Opening SET PASS modal for:', user.email);
+                                                                setPwResetTarget(user);
+                                                            }}
+                                                            className="tag"
+                                                            style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid #F43F5E', cursor: 'pointer', color: '#F43F5E', fontSize: '0.65rem' }}
+                                                        >
+                                                            SET PASS
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setEditingUser(user);
+                                                                setEditForm({ name: user.name, email: user.email });
+                                                            }}
+                                                            className="tag"
+                                                            style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10B981', cursor: 'pointer', color: '#10B981', fontSize: '0.65rem' }}
+                                                        >
+                                                            EDIT
+                                                        </button>
+                                                        <button
+                                                            onClick={() => { impersonate(user); onClose(); }}
+                                                            className="tag"
+                                                            style={{
+                                                                background: currentUser.id === user.id ? 'var(--accent-primary)' : 'rgba(255,255,255,0.05)',
+                                                                border: '1px solid var(--glass-border)',
+                                                                cursor: 'pointer',
+                                                                color: 'white',
+                                                                fontSize: '0.65rem'
+                                                            }}
+                                                        >
+                                                            {currentUser.id === user.id ? 'EYE ACTIVE' : 'IMPERSONATE'}
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
                             </tbody>
                         </table>
                     </div>
@@ -661,6 +948,54 @@ const AdminDashboard = ({ onClose }) => {
                     </div>
                 )}
             </main>
+            {/* Password Reset Modal */}
+            {pwResetTarget && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 10000, padding: '20px'
+                }}>
+                    <div className="glass-panel" style={{ maxWidth: '400px', width: '100%', padding: '30px' }}>
+                        <h3 style={{ margin: '0 0 10px 0' }}>Manual Password Reset</h3>
+                        <p style={{ fontSize: '0.8rem', color: '#888', marginBottom: '20px' }}>
+                            Setting new password for: <strong>{pwResetTarget.email}</strong>
+                        </p>
+
+                        <input
+                            type="password"
+                            placeholder="New Password (min 6 chars)"
+                            value={newPassForm}
+                            onChange={(e) => setNewPassForm(e.target.value)}
+                            style={{
+                                width: '100%', padding: '12px', background: '#111', border: '1px solid #444',
+                                borderRadius: '8px', color: 'white', marginBottom: '20px'
+                            }}
+                        />
+
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button
+                                onClick={handleManualPasswordReset}
+                                disabled={isUpdatingPass}
+                                style={{
+                                    flex: 1, padding: '10px', background: 'var(--accent-primary)',
+                                    border: 'none', borderRadius: '8px', color: 'white', fontWeight: 600, cursor: 'pointer'
+                                }}
+                            >
+                                {isUpdatingPass ? 'Updating...' : 'Update Password'}
+                            </button>
+                            <button
+                                onClick={() => setPwResetTarget(null)}
+                                style={{
+                                    padding: '10px 20px', background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid #444', borderRadius: '8px', color: 'white', cursor: 'pointer'
+                                }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

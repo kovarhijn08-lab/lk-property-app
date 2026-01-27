@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { firestoreOperations } from '../hooks/useFirestore';
 import { skynet } from '../utils/SkynetLogger';
+import { getSessionId } from '../utils/session';
 
 /**
  * Global Error Monitor (Skynet Component)
@@ -14,6 +14,7 @@ const ErrorMonitor = ({ children, user }) => {
                 ...errorData,
                 userId: user?.id || 'anonymous',
                 userEmail: user?.email || 'anonymous',
+                sessionId: getSessionId(),
                 userAgent: navigator.userAgent
             });
             console.warn('⚠️ Global Error Reported to Skynet Hub');

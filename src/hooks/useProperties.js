@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useFirestoreCollection, firestoreOperations } from './useFirestore';
-import { where } from 'firebase/firestore';
+import { where, or } from 'firebase/firestore';
 import { skynet } from '../utils/SkynetLogger';
 
 /**
@@ -10,17 +10,33 @@ import { skynet } from '../utils/SkynetLogger';
  * @param {string} userId - ID авторизованного пользователя
  * @returns {Object} - properties, loading, и CRUD методы
  */
-export const useProperties = (userId) => {
-    // Мемоизируем параметры запроса, чтобы не вызывать бесконечные переподписки
-    const queryConstraints = useMemo(() =>
-        userId ? [where('userId', '==', userId)] : [],
-        [userId]);
+export const useProperties = (user) => {
+    const userId = user?.id;
+    const role = user?.role;
 
-    // Загрузка properties пользователя из Firestore с real-time обновлениями
-    const { data: properties, loading, error } = useFirestoreCollection(
-        userId ? 'properties' : null,
-        queryConstraints
-    );
+    // Мемоизируем параметры запроса
+    const queryConstraints = useMemo(() => {
+        if (!userId) return [];
+
+        // Owner/PMC/Admin: see properties they own (created by them)
+        if (role === 'owner' || role === 'pmc' || role === 'admin') {
+            return [where('userId', '==', userId)];
+        }
+
+
+        // Tenant: see properties where they are registered OR where they are the creator (fallback)
+        if (role === 'tenant') {
+            return [
+                or(
+                    where('tenantEmails', 'array-contains', user.email),
+                    where('userId', '==', userId)
+                )
+            ];
+        }
+
+        // Default: only their own
+        return [where('userId', '==', userId)];
+    }, [userId, role, user?.email]);
 
     /**
      * Добавить новый property
@@ -135,6 +151,12 @@ export const useProperties = (userId) => {
 
         return response;
     };
+
+    // Загрузка properties пользователя из Firestore с real-time обновлениями
+    const { data: properties, loading, error } = useFirestoreCollection(
+        userId ? 'properties' : null,
+        queryConstraints
+    );
 
     return {
         properties: properties || [],

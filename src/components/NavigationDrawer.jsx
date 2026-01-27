@@ -38,9 +38,19 @@ const NavigationDrawer = ({
         }
     };
 
+    const isTenant = user?.role === 'tenant';
+    const isOwner = user?.role === 'owner';
+    const isPMC = user?.role === 'pmc' || user?.role === 'admin' || user?.email === 'admin@example.com';
+
     const menuItems = [
-        { id: 'all', icon: <TrendUpIcon size={20} />, label: t('common.allProperties'), action: () => onSelectProperty('all') },
-        { id: 'calendar', icon: <CalendarIcon size={20} />, label: t('common.calendar'), action: () => onOpenCalendar() },
+        {
+            id: 'all',
+            icon: <TrendUpIcon size={20} />,
+            label: isTenant ? 'Dashboard' : (isOwner ? 'Portfolio' : t('common.allProperties')),
+            action: () => onSelectProperty('all')
+        },
+        // Only show calendar to PMC/Owners
+        ...(!isTenant ? [{ id: 'calendar', icon: <CalendarIcon size={20} />, label: t('common.calendar'), action: () => onOpenCalendar() }] : []),
     ];
 
     // Swipe to close handler
@@ -297,27 +307,29 @@ const NavigationDrawer = ({
                             ))}
                         </div>
 
-                        <button
-                            onClick={() => { onAddProperty(); onClose(); }}
-                            style={{
-                                width: '100%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '14px 16px',
-                                marginTop: '16px',
-                                background: 'transparent',
-                                border: '1px dashed rgba(255,255,255,0.1)',
-                                borderRadius: '12px',
-                                color: 'var(--accent-primary)',
-                                fontSize: '0.9rem',
-                                cursor: 'pointer',
-                                fontWeight: 600
-                            }}
-                        >
-                            <span style={{ display: 'flex' }}><EditIcon size={16} /></span>
-                            {t('common.add')} {t('common.ready')}
-                        </button>
+                        {!isTenant && (
+                            <button
+                                onClick={() => { onAddProperty(); onClose(); }}
+                                style={{
+                                    width: '100%',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '12px',
+                                    padding: '14px 16px',
+                                    marginTop: '16px',
+                                    background: 'transparent',
+                                    border: '1px dashed rgba(255,255,255,0.1)',
+                                    borderRadius: '12px',
+                                    color: 'var(--accent-primary)',
+                                    fontSize: '0.9rem',
+                                    cursor: 'pointer',
+                                    fontWeight: 600
+                                }}
+                            >
+                                <span style={{ display: 'flex' }}><EditIcon size={16} /></span>
+                                {t('common.add')} {t('common.ready')}
+                            </button>
+                        )}
                     </div>
                 </nav>
 

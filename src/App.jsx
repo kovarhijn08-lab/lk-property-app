@@ -48,8 +48,12 @@ import AdminDashboard from './components/AdminDashboard'; // [NEW]
 import ErrorMonitor from './components/ErrorMonitor'; // [NEW]
 import ErrorBoundary from './components/ErrorBoundary'; // [NEW]
 import { skynet } from './utils/SkynetLogger'; // [NEW]
+import { getSessionId } from './utils/session';
 import GlobalChatList from './components/GlobalChatList'; // [NEW]
 import SupportChat from './components/SupportChat'; // [NEW]
+import OwnerPortal from './components/OwnerPortal'; // [NEW]
+import TenantArea from './components/TenantArea'; // [NEW]
+import UtilityChargeback from './components/UtilityChargeback'; // [NEW]
 
 function App() {
   const { t } = useLanguage(); // Ensure t is available
@@ -61,7 +65,7 @@ function App() {
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Properties from Firestore (replacing localStorage)
-  const { properties, loading: propertiesLoading, error: propertiesError, addProperty: addPropertyToFirestore, updateProperty: updatePropertyInFirestore, deleteProperty: deletePropertyFromFirestore } = useProperties(currentUser?.id);
+  const { properties, loading: propertiesLoading, error: propertiesError, addProperty: addPropertyToFirestore, updateProperty: updatePropertyInFirestore, deleteProperty: deletePropertyFromFirestore } = useProperties(currentUser);
   const { vendors, addVendor, deleteVendor } = useVendors(currentUser?.id);
 
   const [selectedPropertyId, setSelectedPropertyId] = useState('all');
@@ -72,6 +76,7 @@ function App() {
   const [showScanner, setShowScanner] = useState(false);
   const [showScenarioPlanner, setShowScenarioPlanner] = useState(false);
   const [showAdminDashboard, setShowAdminDashboard] = useState(false); // [NEW]
+  const [showUtilityChargeback, setShowUtilityChargeback] = useState(false); // [NEW]
   const [showSettings, setShowSettings] = useState(false);
 
   const [detailInitialTab, setDetailInitialTab] = useState('overview'); // [NEW]
@@ -100,7 +105,8 @@ function App() {
     return saved ? JSON.parse(saved) : { warningPeriod: 30 };
   });
   const [prefilledTransactionData, setPrefilledTransactionData] = useState(null);
-  const [showSupportChat, setShowSupportChat] = useState(false);
+  const [activeSupportUserId, setActiveSupportUserId] = useState(null);
+  const [showSupportView, setShowSupportView] = useState(false);
   const [safeMode, setSafeMode] = useState(false);
   const [loadFailures, setLoadFailures] = useState(() => {
     const saved = sessionStorage.getItem('pocketLedger_load_failures');
@@ -147,6 +153,39 @@ function App() {
       setSafeMode(true);
     }
   };
+
+  // [NEW] Global Error Tracking
+  useEffect(() => {
+    const handleError = (event) => {
+      const errorMsg = event.error?.message || event.message || 'Unknown Error';
+      skynet.crash(`Global Uncaught Error: ${errorMsg}`, {
+        stack: event.error?.stack,
+        url: event.filename,
+        line: event.lineno,
+        col: event.colno,
+        userId: actualUser?.id || 'anonymous',
+        sessionId: getSessionId()
+      });
+    };
+
+    const handleRejection = (event) => {
+      skynet.crash(`Unhandled Promise Rejection: ${event.reason?.message || 'Unknown Reason'}`, {
+        reason: event.reason,
+        userId: actualUser?.id || 'anonymous',
+        sessionId: getSessionId()
+      });
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+
+    console.log('[App] Global Skynet Error Listeners Active');
+
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+    };
+  }, [actualUser]);
 
   const resetEverything = () => {
     localStorage.clear();
@@ -315,6 +354,9 @@ function App() {
       case 'createTask':
         setShowTaskForm(true);
         break;
+      case 'utilityChargeback':
+        setShowUtilityChargeback(true);
+        break;
       case 'snooze':
         const snoozeUntil = new Date();
         snoozeUntil.setDate(snoozeUntil.getDate() + 3); // Snooze for 3 days
@@ -481,12 +523,28 @@ function App() {
       />;
     }
     if (isMobile && activeMobileView === 'chats') {
+      if (showSupportView) {
+        return (
+          <div style={{ padding: '8px', paddingBottom: '90px', height: '100%' }}>
+            <SupportChat
+              isInline
+              targetUserId={activeSupportUserId}
+              onClose={() => setShowSupportView(false)}
+            />
+          </div>
+        );
+      }
       return <GlobalChatList
         properties={properties}
-        onNavigateToChat={(propId) => {
-          setSelectedPropertyId(propId);
-          setDetailInitialTab('tenant'); // Ensure tenant tab opens
-          setShowPropertyDetail(true);
+        onNavigateToChat={(propId, unitId, userId) => {
+          if (propId === 'support') {
+            setActiveSupportUserId(userId);
+            setShowSupportView(true);
+          } else {
+            setSelectedPropertyId(propId);
+            setDetailInitialTab('tenant'); // Ensure tenant tab opens
+            setShowPropertyDetail(true);
+          }
         }}
       />;
     }
@@ -521,6 +579,15 @@ function App() {
       if (activeMobileView === 'reports') {
         return <TaxReport properties={properties} onClose={() => setActiveMobileView('dashboard')} />;
       }
+
+      // [NEW] Role-based Dashboard
+      if (currentUser?.role === 'tenant') {
+        return <TenantArea properties={properties} />;
+      }
+      if (currentUser?.role === 'owner') {
+        return <OwnerPortal properties={properties} />;
+      }
+
       return <GlobalDashboard
         properties={properties}
         onPropertyClick={(id) => { setSelectedPropertyId(id); }}
@@ -909,6 +976,28 @@ function App() {
               onClose={() => setShowLeaseScanner(false)}
             />
           )}
+
+          {showUtilityChargeback && (
+            <UtilityChargeback
+              properties={properties}
+              onClose={() => setShowUtilityChargeback(false)}
+              onComplete={async (data) => {
+                const tx = {
+                  id: Date.now(),
+                  amount: data.amount,
+                  category: 'Utilities',
+                  type: 'expense',
+                  description: `Chargeback: ${data.type} from ${data.provider}`,
+                  date: data.date,
+                  chargebackStatus: 'pending'
+                };
+                await addTransaction(tx);
+                setShowUtilityChargeback(false);
+                setToast({ message: 'Utility bill processed and re-invoiced! ⚡', type: 'success' });
+              }}
+            />
+          )}
+
           {isAuthenticated && isMobile && (
             <MobileNav
               activeView={activeMobileView}
@@ -937,39 +1026,6 @@ function App() {
           {/* Admin Dashboard */}
           {showAdminDashboard && <AdminDashboard onClose={() => setShowAdminDashboard(false)} />}
 
-          {/* Support Chat Floating Toggle */}
-          {isAuthenticated && (
-            <>
-              {!showSupportChat && (
-                <button
-                  onClick={() => setShowSupportChat(true)}
-                  style={{
-                    position: 'fixed',
-                    bottom: isMobile ? '90px' : '30px',
-                    right: '25px',
-                    width: '56px',
-                    height: '56px',
-                    borderRadius: '18px',
-                    background: 'var(--gradient-primary)',
-                    border: 'none',
-                    boxShadow: '0 8px 30px rgba(0,0,0,0.3)',
-                    cursor: 'pointer',
-                    zIndex: 2500,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '1.5rem',
-                    transition: 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
-                  }}
-                  onMouseEnter={(e) => e.target.style.transform = 'scale(1.1)'}
-                  onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
-                >
-                  💬
-                </button>
-              )}
-              {showSupportChat && <SupportChat onClose={() => setShowSupportChat(false)} />}
-            </>
-          )}
         </Layout>
       </ErrorMonitor>
     </ErrorBoundary>

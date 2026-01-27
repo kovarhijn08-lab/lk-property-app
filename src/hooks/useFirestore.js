@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     collection,
     doc,
@@ -13,6 +13,47 @@ import {
     serverTimestamp
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { skynet } from '../utils/SkynetLogger';
+
+const RETRYABLE_ERRORS = new Set([
+    'unavailable',
+    'aborted',
+    'deadline-exceeded',
+    'resource-exhausted'
+]);
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const withRetry = async (fn, context, attempts = 3, baseDelayMs = 300) => {
+    let lastError = null;
+
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+        try {
+            return await fn();
+        } catch (error) {
+            lastError = error;
+            const code = error?.code?.replace('firestore/', '') || error?.code || 'unknown';
+            const isRetryable = RETRYABLE_ERRORS.has(code);
+
+            if (!isRetryable || attempt === attempts - 1) {
+                throw error;
+            }
+
+            const jitter = Math.floor(Math.random() * 100);
+            const delay = baseDelayMs * Math.pow(2, attempt) + jitter;
+            skynet.warn('Firestore transient error, retrying', {
+                ...context,
+                error: error?.message,
+                code,
+                attempt: attempt + 1,
+                delay
+            });
+            await sleep(delay);
+        }
+    }
+
+    throw lastError;
+};
 
 /**
  * Hook for real-time Firestore document
@@ -63,6 +104,17 @@ export const useFirestoreCollection = (collectionName, queryConstraints = []) =>
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Use a composite key for dependencies to ensure re-subscription when query parameters 
+    // or the underlying user/context (tracked via queryConstraints) change.
+    const queryKey = useMemo(() => {
+        return JSON.stringify(queryConstraints.map(c => {
+            // Firebase constraints are complex objects, we extract identifying bits
+            if (c._query) return c._query.path.segments.join('/');
+            if (c.type) return `${c.type}-${JSON.stringify(c._values || c.value)}`;
+            return 'constraint';
+        }));
+    }, [queryConstraints]);
+
     useEffect(() => {
         if (!collectionName) {
             setLoading(false);
@@ -73,6 +125,8 @@ export const useFirestoreCollection = (collectionName, queryConstraints = []) =>
         const q = queryConstraints.length > 0
             ? query(collectionRef, ...queryConstraints)
             : collectionRef;
+
+        setLoading(true);
 
         // Real-time listener
         const unsubscribe = onSnapshot(q,
@@ -92,7 +146,7 @@ export const useFirestoreCollection = (collectionName, queryConstraints = []) =>
         );
 
         return () => unsubscribe();
-    }, [collectionName]); // Remove userId dependency as it's not in scope
+    }, [collectionName, queryKey]);
 
     return { data, loading, error };
 };
@@ -105,13 +159,16 @@ export const firestoreOperations = {
     async setDocument(collectionName, docId, data, merge = false) {
         try {
             const docRef = doc(db, collectionName, docId);
-            await setDoc(docRef, {
+            await withRetry(() => setDoc(docRef, {
                 ...data,
                 updatedAt: serverTimestamp()
-            }, { merge });
+            }, { merge }), { action: 'set', collection: collectionName, docId });
+
+            skynet.success(`Document SET in ${collectionName}: ${docId}`, { collection: collectionName, docId });
             return { success: true, id: docId };
         } catch (error) {
             console.error('Set document error:', error);
+            skynet.error(`FAILED SET in ${collectionName}: ${docId}`, { error: error.message, collection: collectionName });
             return { success: false, error: error.message };
         }
     },
@@ -120,13 +177,16 @@ export const firestoreOperations = {
     async updateDocument(collectionName, docId, data) {
         try {
             const docRef = doc(db, collectionName, docId);
-            await updateDoc(docRef, {
+            await withRetry(() => updateDoc(docRef, {
                 ...data,
                 updatedAt: serverTimestamp()
-            });
+            }), { action: 'update', collection: collectionName, docId });
+
+            skynet.success(`Document UPDATED in ${collectionName}: ${docId}`, { collection: collectionName, docId });
             return { success: true };
         } catch (error) {
             console.error('Update document error:', error);
+            skynet.error(`FAILED UPDATE in ${collectionName}: ${docId}`, { error: error.message, collection: collectionName });
             return { success: false, error: error.message };
         }
     },
@@ -135,10 +195,13 @@ export const firestoreOperations = {
     async deleteDocument(collectionName, docId) {
         try {
             const docRef = doc(db, collectionName, docId);
-            await deleteDoc(docRef);
+            await withRetry(() => deleteDoc(docRef), { action: 'delete', collection: collectionName, docId });
+
+            skynet.success(`Document DELETED in ${collectionName}: ${docId}`, { collection: collectionName, docId });
             return { success: true };
         } catch (error) {
             console.error('Delete document error:', error);
+            skynet.error(`FAILED DELETE in ${collectionName}: ${docId}`, { error: error.message, collection: collectionName });
             return { success: false, error: error.message };
         }
     },
@@ -147,7 +210,7 @@ export const firestoreOperations = {
     async getDocument(collectionName, docId) {
         try {
             const docRef = doc(db, collectionName, docId);
-            const docSnap = await getDoc(docRef);
+            const docSnap = await withRetry(() => getDoc(docRef), { action: 'get', collection: collectionName, docId });
 
             if (docSnap.exists()) {
                 return {
@@ -171,7 +234,7 @@ export const firestoreOperations = {
                 ? query(collectionRef, ...queryConstraints)
                 : collectionRef;
 
-            const querySnapshot = await getDocs(q);
+            const querySnapshot = await withRetry(() => getDocs(q), { action: 'list', collection: collectionName });
             const items = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()

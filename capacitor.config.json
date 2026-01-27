@@ -1,0 +1,5 @@
+{
+  "appId": "com.pocketledger.app",
+  "appName": "Smart Pocket Ledger",
+  "webDir": "dist"
+}

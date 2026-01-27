@@ -19,6 +19,7 @@ const ActionOverlay = ({ isOpen, onClose, onAddTransaction, onAddProperty, onUpl
         { label: 'Создать задачу', icon: <BellIcon size={20} />, handler: () => onAction('createTask'), color: 'var(--accent-warning)' },
         { label: 'Добавить Объект', icon: <HomeIcon size={20} />, handler: onAddProperty, color: 'var(--accent-primary)' },
         { label: 'Загрузить Чек', icon: <ReceiptIcon size={20} />, handler: onUploadReceipt, color: 'var(--accent-warning)' },
+        { label: 'Перевыставить КУ', icon: <DollarIcon size={20} />, handler: () => onAction('utilityChargeback'), color: '#10B981' },
         { label: 'Сканировать Договор', icon: <FileIcon size={20} />, handler: onScanLease, color: '#F43F5E' }
     ];
 

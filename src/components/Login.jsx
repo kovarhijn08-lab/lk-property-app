@@ -17,7 +17,8 @@ const Login = ({ onLogin, onSwitchToSignup }) => {
                 setError(result.error);
             }
         } catch (err) {
-            setError('An unexpected error occurred. Please try again.');
+            console.error('Login submit error:', err);
+            setError(err.message || 'An unexpected error occurred. Please try again.');
         } finally {
             setLoading(false);
         }
