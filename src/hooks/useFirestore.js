@@ -107,12 +107,20 @@ export const useFirestoreCollection = (collectionName, queryConstraints = []) =>
     // Use a composite key for dependencies to ensure re-subscription when query parameters 
     // or the underlying user/context (tracked via queryConstraints) change.
     const queryKey = useMemo(() => {
-        return JSON.stringify(queryConstraints.map(c => {
-            // Firebase constraints are complex objects, we extract identifying bits
-            if (c._query) return c._query.path.segments.join('/');
-            if (c.type) return `${c.type}-${JSON.stringify(c._values || c.value)}`;
-            return 'constraint';
-        }));
+        try {
+            return JSON.stringify(queryConstraints, (key, value) => {
+                // Handle complex Firestore internal structures that normally don't stringify well
+                if (value && typeof value === 'object') {
+                    if (value._query) return value._query.path.segments.join('/');
+                    if (value.type && (value.type === 'where' || value.type === 'orderBy')) {
+                        return `${value.type}-${value._field?.segments?.join('.')}-${JSON.stringify(value._value)}`;
+                    }
+                }
+                return value;
+            });
+        } catch (e) {
+            return Math.random(); // Fallback to force update if stringify fails
+        }
     }, [queryConstraints]);
 
     useEffect(() => {
