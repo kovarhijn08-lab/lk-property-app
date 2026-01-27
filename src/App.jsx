@@ -140,6 +140,7 @@ function App() {
     }
 
     if (propertiesError) {
+      setToast({ message: `Property Load Error: ${propertiesError}`, type: 'error' });
       handleCriticalFailure();
     }
   }, [properties, propertiesLoading, authLoading, isAuthenticated, propertiesError]);

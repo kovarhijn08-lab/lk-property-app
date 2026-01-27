@@ -21,8 +21,7 @@ export const useProperties = (user) => {
         // Owner/PMC/Admin: see properties they own (created by them)
         if (role === 'owner' || role === 'pmc' || role === 'admin') {
             return [
-                where('userId', '==', userId),
-                orderBy('updatedAt', 'desc')
+                where('userId', '==', userId)
             ];
         }
 
@@ -32,15 +31,13 @@ export const useProperties = (user) => {
                 or(
                     where('tenantEmails', 'array-contains', user.email),
                     where('userId', '==', userId)
-                ),
-                orderBy('updatedAt', 'desc')
+                )
             ];
         }
 
         // Default: only their own
         return [
-            where('userId', '==', userId),
-            orderBy('updatedAt', 'desc')
+            where('userId', '==', userId)
         ];
     }, [userId, role, user?.email]);
 
