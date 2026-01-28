@@ -119,10 +119,17 @@
 - Admin: экспорт логов/инцидентов в JSON + отображение suppressedCount в детали лога (`app/src/components/AdminDashboard.jsx`, `app/src/translations/index.js`).
 - Tenant: quick actions ведут в Chat/Maintenance/Docs (`app/src/pages/tenant/TenantDashboard.jsx`, `app/src/pages/tenant/TenantPortal.jsx`).
 - Обновлён `manual_verification.md` (AP 1, AP 2, TP 6).
+- Обновлён `docs/ops_proof.md` с TODO по недостающим доказательствам (Partial).
+- **PUSH TO DEPLOY**: Все изменения за период 2026-01-28 (Consolidation, Admin MVP, Error Logging, Dedupe, Polish) отправлены в ветку `main`.
+- Структура репозитория исправлена: `.github` и `manual_verification.md` перенесены в `app/` (корень git).
 
 ## 2026-01-28 — GPT мозг (Admin Users UX)
 - Добавлены search + role filter + export в Users (`app/src/components/AdminDashboard.jsx`, `app/src/translations/index.js`).
 - Обновлён `manual_verification.md` (AU 1, AU 2).
+
+## 2026-01-28 — GPT мозг (Invite Link UX)
+- Добавлена явная ошибка при создании инвайта + подсказка по правам (`app/src/components/InviteManager.jsx`).
+- Используется `VITE_APP_BASE_URL` при формировании ссылки (fallback на `window.location.origin`).
  - Обновлён `docs/ops_proof.md` с TODO по недостающим доказательствам (Partial).
 
 ---

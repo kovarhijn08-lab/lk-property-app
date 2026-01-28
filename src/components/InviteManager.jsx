@@ -5,14 +5,20 @@ import { skynet } from '../utils/SkynetLogger';
 import { hashToken } from '../utils/crypto';
 
 const InviteManager = ({ propertyId, unitId, onInviteSent }) => {
-    const { currentUser } = useAuth();
+    const { currentUser, isPMC, isOwner } = useAuth();
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [inviteLink, setInviteLink] = useState('');
     const [copied, setCopied] = useState(false);
+    const [errorMsg, setErrorMsg] = useState('');
 
     const generateInvite = async () => {
         if (loading) return;
+        setErrorMsg('');
+        if (!isPMC && !isOwner) {
+            setErrorMsg('Недостаточно прав для создания инвайта. Нужна роль Owner/PMC/Admin.');
+            return;
+        }
         setLoading(true);
         try {
             const rawToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
@@ -36,7 +42,7 @@ const InviteManager = ({ propertyId, unitId, onInviteSent }) => {
             const result = await firestoreOperations.setDocument('invitations', inviteId, inviteData);
 
             if (result.success) {
-                const baseUrl = window.location.origin;
+                const baseUrl = import.meta.env.VITE_APP_BASE_URL || window.location.origin;
                 const link = `${baseUrl}/signup?invite=${rawToken}`;
                 setInviteLink(link);
 
@@ -50,11 +56,14 @@ const InviteManager = ({ propertyId, unitId, onInviteSent }) => {
 
                 if (onInviteSent) onInviteSent(inviteData);
             } else {
-                alert('Error saving invite to database');
+                const permissionHint = result.error?.toLowerCase().includes('permission')
+                    ? 'Проверьте, что ваш пользователь имеет роль Owner/PMC/Admin и существует в коллекции users.'
+                    : '';
+                setErrorMsg(`Ошибка сохранения инвайта: ${result.error || 'unknown'}. ${permissionHint}`.trim());
             }
         } catch (error) {
             console.error('Failed to generate invite:', error);
-            alert('Error generating invite');
+            setErrorMsg(`Ошибка генерации инвайта: ${error.message}`);
         } finally {
             setLoading(false);
         }
@@ -75,6 +84,11 @@ const InviteManager = ({ propertyId, unitId, onInviteSent }) => {
                     <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', margin: 0 }}>
                         Create a one-time registration link for this {unitId ? 'unit' : 'property'}.
                     </p>
+                    {errorMsg && (
+                        <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#EF4444', fontSize: '0.8rem' }}>
+                            {errorMsg}
+                        </div>
+                    )}
                     <input
                         type="email"
                         value={email}
