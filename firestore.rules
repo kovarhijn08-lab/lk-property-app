@@ -14,13 +14,16 @@ service cloud.firestore {
 
     // Функция проверки глобального администратора (по email и UID)
     function isWhitelistedAdmin() {
-      let email = request.auth.token.get('email', '');
       return isAuthenticated() && 
-        (email == 'admin@example.com' || 
-         email == 'admintest@admin.ru' || 
-         email == 'final_test_8812@example.com' ||
+        (request.auth.token.email == 'admin@example.com' || 
+         request.auth.token.email == 'admintest@admin.ru' || 
+         request.auth.token.email == 'final_test_8812@example.com' ||
          request.auth.uid == 'gXLLyfbt5aMPIcjdJIB6xUoLYht2' ||
-         request.auth.uid == 'qXLLyfbt5aMPIcjdJIB6xUoLYht2'); // Added variant from logs
+         request.auth.uid == 'qXLLyfbt5aMPIcjdJIB6xUoLYht2');
+    }
+
+    match /deploy_check/canary {
+      allow read: if true;
     }
 
     // Безопасное получение роли
