@@ -54,6 +54,9 @@ import SupportChat from './components/SupportChat'; // [NEW]
 import OwnerPortal from './components/OwnerPortal'; // [NEW]
 import TenantArea from './components/TenantArea'; // [NEW]
 import UtilityChargeback from './components/UtilityChargeback'; // [NEW]
+import Onboarding from './components/Onboarding'; // [NEW]
+import { SearchOverlay } from './components/SearchOverlay'; // [NEW]
+import { useSearch } from './hooks/useSearch'; // [NEW]
 
 function App() {
   const { t } = useLanguage(); // Ensure t is available
@@ -113,6 +116,11 @@ function App() {
     return saved ? parseInt(saved) : 0;
   });
 
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const { performSearch } = useSearch(properties, currentUser);
+  const searchResults = performSearch(searchQuery);
+
   // Sync states to localStorage (for MVP persistence as requested in roadmap/directives)
   useEffect(() => {
     localStorage.setItem('pocketLedger_snoozed', JSON.stringify(snoozedTasks));
@@ -144,6 +152,41 @@ function App() {
       handleCriticalFailure();
     }
   }, [properties, propertiesLoading, authLoading, isAuthenticated, propertiesError]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const handleSearchResultSelect = (result) => {
+    setIsSearchOpen(false);
+
+    if (result.propertyId) {
+      setSelectedPropertyId(result.propertyId);
+    }
+
+    if (result.linkTarget === 'legal') {
+      setShowPropertyDetail(true);
+      setDetailInitialTab('legal');
+      setActiveMobileView('portfolio');
+    } else {
+      setShowPropertyDetail(true);
+      setDetailInitialTab('overview');
+      setActiveMobileView('dashboard');
+    }
+
+    skynet.log(`Search result selected: ${result.label}`, 'info', {
+      action: 'global_search.select',
+      entityType: result.type,
+      entityId: result.id
+    });
+  };
 
   const handleCriticalFailure = () => {
     const newFailures = loadFailures + 1;
@@ -276,10 +319,22 @@ function App() {
 
   // Show login/signup if not authenticated
   if (!isAuthenticated) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const inviteToken = urlParams.get('invite');
+
     if (authView === 'signup') {
-      return <SignUp onSignup={signup} onSwitchToLogin={() => setAuthView('login')} />;
+      return <SignUp onSignup={signup} onSwitchToLogin={() => setAuthView('login')} inviteToken={inviteToken} />;
     }
     return <Login onLogin={login} onForgotPassword={sendPasswordReset} onSwitchToSignup={() => setAuthView('signup')} />;
+  }
+
+  // [NEW] Onboarding Flow for new users
+  // Only show if: 
+  // 1. Not an admin (Admins skip onboarding to manage system)
+  // 2. No properties yet (Existing users skip)
+  // 3. Document says onboarding is NOT completed
+  if (currentUser && !isAdmin && !currentUser.onboardingCompleted && !propertiesLoading && properties.length === 0) {
+    return <Onboarding onComplete={() => window.location.reload()} />;
   }
 
   const selectedProperty = properties.find(p => p.id === selectedPropertyId);
@@ -325,6 +380,15 @@ function App() {
 
     if (response.success) {
       setToast({ message: `Успешно! Записано ${newTransactions.length} поз. ✨`, type: 'success' });
+
+      skynet.log(`Transactions added to ${targetPropertyId}`, 'success', {
+        actorId: currentUser.uid,
+        action: 'transaction.create',
+        entityType: 'property',
+        entityId: targetPropertyId,
+        metadata: { count: newTransactions.length, transactions: newTransactions }
+      });
+
       setShowTransactionForm(false);
       setPrefilledTransactionData(null);
     } else {
@@ -420,20 +484,40 @@ function App() {
   const deleteTransaction = async (txId) => {
     if (!selectedProperty) return;
     const updatedTransactions = selectedProperty.transactions.filter(t => t.id !== txId);
-    await updatePropertyInFirestore(selectedPropertyId, {
+    const response = await updatePropertyInFirestore(selectedPropertyId, {
       ...selectedProperty,
       transactions: updatedTransactions
     });
+
+    if (response.success) {
+      skynet.log(`Transaction deleted: ${txId}`, 'warning', {
+        actorId: currentUser.uid,
+        action: 'transaction.delete',
+        entityType: 'property',
+        entityId: selectedPropertyId,
+        metadata: { txId }
+      });
+    }
   };
 
   // Contract CRUD
   const addContract = async (newContract) => {
     if (!selectedProperty) return;
     const updatedContracts = [...(selectedProperty.contracts || []), newContract];
-    await updatePropertyInFirestore(selectedPropertyId, {
+    const response = await updatePropertyInFirestore(selectedPropertyId, {
       ...selectedProperty,
       contracts: updatedContracts
     });
+
+    if (response.success) {
+      skynet.log(`Contract added to ${selectedPropertyId}`, 'success', {
+        actorId: currentUser.uid,
+        action: 'contract.create',
+        entityType: 'property',
+        entityId: selectedPropertyId,
+        metadata: { contractId: newContract.id }
+      });
+    }
   };
 
   const deleteContract = async (contractId) => {
@@ -445,6 +529,14 @@ function App() {
     });
     if (!response.success) {
       setToast({ message: `Ошибка удаления договора: ${response.error}`, type: 'error' });
+    } else {
+      skynet.log(`Contract deleted: ${contractId}`, 'warning', {
+        actorId: currentUser.uid,
+        action: 'contract.delete',
+        entityType: 'property',
+        entityId: selectedPropertyId,
+        metadata: { contractId }
+      });
     }
   };
 
@@ -829,6 +921,7 @@ function App() {
           onOpenSettings={() => setShowSettings(true)}
           onOpenDrawer={() => setIsDrawerOpen(true)}
           onOpenNotifications={() => setIsNotificationDrawerOpen(true)}
+          onOpenSearch={() => setIsSearchOpen(true)}
           notificationCount={getNotificationCount()}
         >
           {isAuthenticated && !propertiesLoading && (
@@ -905,6 +998,14 @@ function App() {
           )}
 
           {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+          <SearchOverlay
+            isOpen={isSearchOpen}
+            onClose={() => setIsSearchOpen(false)}
+            results={searchResults}
+            onQueryChange={setSearchQuery}
+            onSelect={handleSearchResultSelect}
+          />
 
           {showSettings && (
             <Settings

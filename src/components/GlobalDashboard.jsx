@@ -9,6 +9,8 @@ import Toast from './Toast';
 import { useLanguage } from '../context/LanguageContext';
 import { initialProperties } from '../data/properties';
 import { TrendUpIcon, TrendDownIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIcon, PlusIcon, ExportIcon } from './Icons';
+import FilterBar from './FilterBar'; // [NEW]
+import { getUniqueTags, getTagColor, matchTags } from '../utils/tagUtils'; // [NEW]
 
 const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateProperty, onAddProperty, onOpenDrawer, user }) => {
     const { t } = useLanguage();
@@ -16,11 +18,29 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
     const [editingPropertyId, setEditingPropertyId] = useState(null);
     const [toast, setToast] = useState(null);
 
+    // [NEW] Filter States
+    const [selectedTags, setSelectedTags] = useState([]);
+    const [selectedType, setSelectedType] = useState('all');
+    const [selectedStatus, setSelectedStatus] = useState('all');
+
     // Aggregated Calculations
     // Aggregated Calculations
     const safeProperties = Array.isArray(properties) ? properties : [];
-    const activeProperties = safeProperties.filter(p => p.status !== 'sold');
-    const soldProperties = safeProperties.filter(p => p.status === 'sold');
+
+    // [NEW] Filtering Logic
+    const filteredProperties = safeProperties.filter(p => {
+        const matchesType = selectedType === 'all' || p.type === selectedType;
+        const matchesStatus = selectedStatus === 'all' || p.occupancyStatus === selectedStatus;
+        const matchesTags = matchTags(p, selectedTags);
+        return matchesType && matchesStatus && matchesTags;
+    });
+
+    const activeProperties = filteredProperties.filter(p => p.status !== 'sold');
+    const soldProperties = filteredProperties.filter(p => p.status === 'sold');
+
+    const allAvailableTags = getUniqueTags(safeProperties);
+    const availableTypes = Array.from(new Set(safeProperties.map(p => p.type)));
+    const availableStatuses = Array.from(new Set(safeProperties.map(p => p.occupancyStatus).filter(Boolean)));
 
     const totalValue = activeProperties.reduce((acc, p) => acc + (Number(p.marketValue) || 0), 0);
     const totalInvested = activeProperties.reduce((acc, p) => acc + (Number(p.purchasePrice) || 0), 0);
@@ -323,12 +343,29 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
 
             {/* Asset Inventory */}
             <section>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                     <h2 style={{ fontSize: '0.85rem', fontWeight: 900, margin: 0, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('common.allProperties')}</h2>
                     <div style={{ height: '1px', flex: 1, background: 'linear-gradient(to right, rgba(255,255,255,0.1), transparent)' }}></div>
                 </div>
+
+                {/* [NEW] Filter Bar Integration */}
+                <FilterBar
+                    availableTags={allAvailableTags}
+                    selectedTags={selectedTags}
+                    onTagToggle={(tag) => {
+                        setSelectedTags(prev =>
+                            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                        );
+                    }}
+                    types={availableTypes}
+                    selectedType={selectedType}
+                    onTypeChange={setSelectedType}
+                    statuses={availableStatuses}
+                    selectedStatus={selectedStatus}
+                    onStatusChange={setSelectedStatus}
+                />
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '10px' }}>
-                    {properties.map(p => (
+                    {filteredProperties.map(p => (
                         <div
                             key={p.id}
                             onClick={() => onPropertyClick(p.id)}
@@ -392,6 +429,27 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
                                         )}
                                     </div>
                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 600 }}>{p.address}</div>
+
+                                    {/* [NEW] Tags Display */}
+                                    {p.tags && p.tags.length > 0 && (
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '6px' }}>
+                                            {p.tags.map(tag => (
+                                                <span
+                                                    key={tag}
+                                                    style={{
+                                                        background: getTagColor(tag),
+                                                        fontSize: '0.6rem',
+                                                        padding: '1px 6px',
+                                                        borderRadius: '4px',
+                                                        color: 'white',
+                                                        fontWeight: 700
+                                                    }}
+                                                >
+                                                    #{tag}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>

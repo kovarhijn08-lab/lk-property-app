@@ -93,7 +93,7 @@ const UserProfile = ({ user, onLogout, onOpenSettings }) => {
                                 alignItems: 'center'
                             }}
                         >
-                            <span>🌐 {t('common.profile')} Language</span>
+                            <span>🌐 {lang === 'ru' ? 'Язык / Language' : 'Language / Язык'}</span>
                             <span style={{ color: 'var(--accent-success)', fontSize: '0.8rem' }}>{lang.toUpperCase()}</span>
                         </button>
 

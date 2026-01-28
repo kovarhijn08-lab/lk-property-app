@@ -3,6 +3,7 @@ import { useLanguage } from '../context/LanguageContext';
 import SideDrawer from './SideDrawer';
 import { HomeIcon, HotelIcon, OfficeIcon, BuildingIcon } from './Icons';
 import { validateForm } from '../utils/validators';
+import TagInput from './TagInput'; // [NEW]
 
 const AddPropertyForm = ({ onSubmit, onClose }) => {
     const { t } = useLanguage();
@@ -13,6 +14,7 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
     const [address, setAddress] = useState('');
     const [purchasePrice, setPurchasePrice] = useState('');
     const [isUnderConstruction, setIsUnderConstruction] = useState(false);
+    const [tags, setTags] = useState([]); // [NEW]
 
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
@@ -54,7 +56,8 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                 progress: 0,
                 statusMessage: 'Project initiated.',
                 installments: []
-            })
+            }),
+            tags // [NEW]
         });
     };
 
@@ -113,7 +116,7 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                         {[
                             { id: 'rental', icon: <HomeIcon size={18} />, label: t('common.ready') },
                             { id: 'str', icon: <HotelIcon size={18} />, label: 'STR' },
-                            { id: 'commercial', icon: <OfficeIcon size={18} />, label: 'Commercial' }
+                            { id: 'commercial', icon: <OfficeIcon size={18} />, label: t('dashboard.commercial') }
                         ].map(opt => (
                             <button
                                 key={opt.id}
@@ -296,6 +299,14 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                         }}
                     />
                     {renderFieldError('marketValue', purchasePrice)}
+                </div>
+
+                {/* [NEW] Tags Section */}
+                <div style={{ marginBottom: '40px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                        {t('common.tags')}
+                    </label>
+                    <TagInput tags={tags} onChange={setTags} />
                 </div>
 
                 <div style={{ display: 'flex', gap: '16px' }}>

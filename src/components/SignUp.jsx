@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 
-const SignUp = ({ onSignup, onSwitchToLogin }) => {
+const SignUp = ({ onSignup, onSwitchToLogin, inviteToken }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [role, setRole] = useState(inviteToken ? 'tenant' : 'owner');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -38,7 +39,7 @@ const SignUp = ({ onSignup, onSwitchToLogin }) => {
 
         setLoading(true);
         try {
-            const result = await onSignup(email, password, name);
+            const result = await onSignup(email, password, name, role, inviteToken); // Pass inviteToken
             if (!result.success) {
                 setError(result.error);
             }
@@ -144,6 +145,51 @@ const SignUp = ({ onSignup, onSwitchToLogin }) => {
                                 fontSize: '0.95rem'
                             }}
                         />
+                    </div>
+
+                    <div>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '8px',
+                            fontSize: '0.85rem',
+                            color: 'var(--text-secondary)'
+                        }}>
+                            Role
+                        </label>
+                        {inviteToken ? (
+                            <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '8px', color: '#60A5FA', fontSize: '0.9rem', fontWeight: 600 }}>
+                                🔗 Registering as Tenant (via Invite)
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    {['owner', 'pmc'].map(r => (
+                                        <button
+                                            key={r}
+                                            type="button"
+                                            onClick={() => setRole(r)}
+                                            style={{
+                                                flex: 1,
+                                                padding: '10px',
+                                                borderRadius: '8px',
+                                                border: role === r ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                                background: role === r ? 'rgba(99, 102, 241, 0.1)' : 'rgba(255,255,255,0.03)',
+                                                color: role === r ? 'white' : 'var(--text-secondary)',
+                                                fontSize: '0.85rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                textTransform: 'uppercase'
+                                            }}
+                                        >
+                                            {r}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
+                                    ⚠️ Tenants: You cannot sign up independently. Please ask your manager for an invitation link.
+                                </p>
+                            </>
+                        )}
                     </div>
 
                     <div>

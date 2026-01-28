@@ -18,10 +18,15 @@ export const useProperties = (user) => {
     const queryConstraints = useMemo(() => {
         if (!userId) return [];
 
-        // Owner/PMC/Admin: see properties they own (created by them)
+        // Owner/PMC/Admin: see properties they own OR manage
         if (role === 'owner' || role === 'pmc' || role === 'admin') {
             return [
-                where('userId', '==', userId)
+                or(
+                    where('ownerIds', 'array-contains', userId),
+                    where('managerIds', 'array-contains', userId),
+                    where('ownerId', '==', userId), // Direct owner link
+                    where('userId', '==', userId) // Fallback for old records
+                )
             ];
         }
 
@@ -29,7 +34,9 @@ export const useProperties = (user) => {
         if (role === 'tenant') {
             return [
                 or(
-                    where('tenantEmails', 'array-contains', user.email),
+                    where('tenantIds', 'array-contains', userId),
+                    where('tenantId', '==', userId), // Direct tenant link
+                    where('tenantEmails', 'array-contains', user.email || ''),
                     where('userId', '==', userId)
                 )
             ];
@@ -51,7 +58,9 @@ export const useProperties = (user) => {
 
         const newProperty = {
             ...propertyData,
-            userId,
+            userId, // Creator
+            ownerIds: propertyData.ownerIds || (role === 'owner' ? [userId] : []),
+            managerIds: propertyData.managerIds || (role === 'pmc' || role === 'admin' ? [userId] : []),
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -127,37 +136,52 @@ export const useProperties = (user) => {
             return { success: false, error: 'User not authenticated' };
         }
 
-        // Create snapshot for Undo
         try {
             const currentDoc = await firestoreOperations.getDocument('properties', propertyId);
-            if (currentDoc.success) {
-                await skynet.log(`Delete snapshot for "${propertyId}"`, 'warning', {
+            if (!currentDoc.success) return currentDoc;
+
+            const data = currentDoc.data;
+            const updatedOwnerIds = (data.ownerIds || []).filter(id => id !== userId);
+            const updatedManagerIds = (data.managerIds || []).filter(id => id !== userId);
+
+            // Snapshot for safety
+            await skynet.log(`Safe delete check for "${propertyId}"`, 'warning', {
+                actorId: userId,
+                action: 'property.delete.check',
+                entityType: 'property',
+                entityId: propertyId,
+                data
+            });
+
+            // "Safe Delete" Logic: 
+            // If there are other owners or managers, just remove current user's link
+            if (updatedOwnerIds.length > 0 || updatedManagerIds.length > 0) {
+                skynet.info(`Performing soft-delete (unlinking) for ${userId} on ${propertyId}`);
+                const response = await updateProperty(propertyId, {
+                    ownerIds: updatedOwnerIds,
+                    managerIds: updatedManagerIds,
+                    // Wipe legacy userId if it was us
+                    ...(data.userId === userId ? { userId: updatedOwnerIds[0] || updatedManagerIds[0] || 'orphaned' } : {})
+                });
+                return response;
+            }
+
+            // If no one else is linked, perform physical delete
+            skynet.info(`Performing final physical delete for ${propertyId}`);
+            const response = await firestoreOperations.deleteDocument('properties', propertyId);
+            if (response.success) {
+                skynet.log(`Property physically deleted: "${propertyId}"`, 'warning', {
                     actorId: userId,
-                    action: 'property.delete.snapshot',
+                    action: 'property.delete.physical',
                     entityType: 'property',
-                    entityId: propertyId,
-                    data: currentDoc.data
+                    entityId: propertyId
                 });
             }
-        } catch (e) {
-            console.warn('Delete snapshot failed:', e);
+            return response;
+        } catch (error) {
+            console.error('Delete property error:', error);
+            return { success: false, error: error.message };
         }
-
-        const response = await firestoreOperations.deleteDocument(
-            'properties',
-            propertyId
-        );
-
-        if (response.success) {
-            skynet.log(`Property deleted: "${propertyId}"`, 'warning', {
-                actorId: userId,
-                action: 'property.delete',
-                entityType: 'property',
-                entityId: propertyId
-            });
-        }
-
-        return response;
     };
 
     // Загрузка properties пользователя из Firestore с real-time обновлениями

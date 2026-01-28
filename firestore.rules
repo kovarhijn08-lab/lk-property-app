@@ -108,6 +108,17 @@ service cloud.firestore {
       );
     }
 
+    // Правила для коллекции приглашений (invitations)
+    match /invitations/{inviteId} {
+      // PMC и владельцы могут создавать и управлять
+      allow create, read, update, delete: if isPMC() || isOwnerRole();
+      
+      // Анонимные пользователи могут проверять инвайт и обновлять его (использовать)
+      // Мы ограничиваем обновление только полем status и usedAt для безопасности
+      allow read: if true; 
+      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedAt', 'updatedAt']));
+    }
+
     // Правила для системных логов (Skynet Hub)
     match /system_logs/{logId} {
       allow create: if isAuthenticated();

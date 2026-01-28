@@ -9,7 +9,7 @@ import { SendIcon, InfoIcon, ToolIcon, DollarIcon, ChevronDownIcon } from './Ico
 const TenantPortal = ({ property, transactions = [] }) => {
     const { t } = useLanguage();
     const { currentUser } = useAuth();
-    const [activeSection, setActiveSection] = useState('messaging');
+    const [activeSection, setActiveSection] = useState('dashboard');
     const [selectedUnitId, setSelectedUnitId] = useState(property.units && property.units.length > 0 ? property.units[0].id : null);
     const [messageText, setMessageText] = useState('');
 
@@ -59,6 +59,74 @@ const TenantPortal = ({ property, transactions = [] }) => {
         } else {
             setTypingStatus(false);
         }
+    };
+
+    const renderDashboard = () => {
+        const hasUnread = messages.some(m => !m.read && m.userId !== currentUser?.id);
+        const openRequests = requests.filter(r => r.status !== 'Completed');
+
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                {/* Next Action Card */}
+                <div className="glass-panel" style={{ padding: '20px', background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(37, 99, 235, 0.05) 100%)', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: 'var(--accent-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.2rem' }}>
+                            ⚡
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>{t('property.tenantPortal.nextAction')}</div>
+                            <h4 style={{ margin: '4px 0', fontSize: '1.1rem', fontWeight: 800 }}>
+                                {hasUnread ? 'You have unread messages' : openRequests.length > 0 ? 'Maintenance in progress' : t('property.tenantPortal.allSet')}
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                {hasUnread ? 'Manager replied to your message.' : openRequests.length > 0 ? `Your request "${openRequests[0].title}" is being handled.` : t('property.tenantPortal.noPendingActions')}
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => setActiveSection(hasUnread ? 'messaging' : openRequests.length > 0 ? 'maintenance' : 'payments')}
+                        style={{ width: '100%', marginTop: '16px', padding: '10px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'white', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                        {hasUnread ? 'Read Messages' : 'View Status'}
+                    </button>
+                </div>
+
+                {/* Quick Actions Grid */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                    <button
+                        onClick={() => setActiveSection('messaging')}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', cursor: 'pointer' }}
+                    >
+                        <span style={{ fontSize: '1.5rem' }}>💬</span>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 0 }}>Support</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveSection('maintenance')}
+                        style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '16px', borderRadius: '16px', background: 'rgba(255,255,255,0.03)', border: '1px solid var(--glass-border)', cursor: 'pointer' }}
+                    >
+                        <span style={{ fontSize: '1.5rem' }}>🛠️</span>
+                        <span style={{ fontSize: '0.75rem' }}>Fix request</span>
+                    </button>
+                </div>
+
+                {/* Property Snapshot */}
+                <div className="glass-panel" style={{ padding: '20px' }}>
+                    <h4 style={{ margin: '0 0 16px 0', fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{t('property.tenantPortal.propertySnapshot')}</h4>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <div style={{ fontWeight: 800 }}>{property.name}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{property.address}</div>
+                            <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--accent-success)', fontWeight: 700 }}>
+                                <span>🔑</span> Unit {selectedUnit?.name}
+                            </div>
+                        </div>
+                        <div style={{ width: '60px', height: '60px', background: 'white', borderRadius: '8px', padding: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <div style={{ fontSize: '2rem' }}>📱</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     const renderMessaging = () => (
@@ -154,7 +222,7 @@ const TenantPortal = ({ property, transactions = [] }) => {
                     type="text"
                     value={messageText}
                     onChange={handleInputChange}
-                    placeholder={t('tenantPortal.typeMessage')}
+                    placeholder={t('property.tenantPortal.typeMessage')}
                     style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', color: 'white', padding: '12px', borderRadius: '12px', outline: 'none' }}
                 />
                 <button
@@ -224,8 +292,18 @@ const TenantPortal = ({ property, transactions = [] }) => {
                             {paymentLoading ? 'Processing...' : 'Pay Now'}
                         </button>
                     </div>
+
+                    {/* Simple Payment Progress */}
+                    <div style={{ marginTop: '20px', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                        <div style={{ width: '75%', height: '100%', background: 'var(--accent-success)' }}></div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                        <span>Jan 1st</span>
+                        <span>Rent Cycle</span>
+                        <span>Feb 1st</span>
+                    </div>
                 </div>
-                <h4 style={{ margin: '8px 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{t('tenantPortal.paymentHistory')}</h4>
+                <h4 style={{ margin: '8px 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>{t('property.tenantPortal.paymentHistory')}</h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {rentPayments.length > 0 ? rentPayments.slice(0, 5).map(py => (
                         <div key={py.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'rgba(255,255,255,0.02)', borderRadius: '10px' }}>
@@ -259,16 +337,70 @@ const TenantPortal = ({ property, transactions = [] }) => {
                 ) : requests.length === 0 ? (
                     <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>No active requests.</div>
                 ) : (
-                    requests.map(req => (
-                        <div key={req.id} className="glass-panel" style={{ padding: '14px', borderLeft: req.priority === 'High' ? '4px solid #F43F5E' : '4px solid var(--accent-warning)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{req.title}</div>
-                                <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', fontWeight: 800 }}>{req.status}</span>
+                    requests.map(req => {
+                        const stages = ['New', 'Assigned', 'In Progress', 'Resolved'];
+                        const currentStageIdx = stages.indexOf(req.status) !== -1 ? stages.indexOf(req.status) : 0;
+
+                        return (
+                            <div key={req.id} className="glass-panel" style={{ padding: '16px', borderLeft: req.priority === 'High' ? '4px solid #F43F5E' : '4px solid var(--accent-warning)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
+                                    <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>{req.title}</div>
+                                    <span style={{ fontSize: '0.65rem', padding: '2px 8px', borderRadius: '8px', background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', fontWeight: 800 }}>{req.status}</span>
+                                </div>
+
+                                {/* Maintenance Pipeline Visual */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '12px' }}>
+                                    {stages.map((stage, idx) => (
+                                        <React.Fragment key={stage}>
+                                            <div style={{
+                                                flex: 1,
+                                                height: '4px',
+                                                background: idx <= currentStageIdx ? 'var(--accent-warning)' : 'rgba(255,255,255,0.05)',
+                                                borderRadius: '2px'
+                                            }} />
+                                            {idx < stages.length - 1 && <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: idx < currentStageIdx ? 'var(--accent-warning)' : 'rgba(255,255,255,0.1)' }} />}
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', display: 'flex', justifyContent: 'space-between' }}>
+                                    <span>Reported: {new Date(req.createdAt).toLocaleDateString()}</span>
+                                    <span>{stages[currentStageIdx]}</span>
+                                </div>
                             </div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>Reported: {new Date(req.createdAt).toLocaleDateString()}</div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
+            </div>
+        </div>
+    );
+
+    const renderDocuments = () => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div className="glass-panel" style={{ padding: '20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ fontSize: '2rem' }}>📜</div>
+                    <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: 800 }}>Lease Agreement</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Status: Active • Signed on {property.createdAt?.split('T')[0]}</div>
+                    </div>
+                    <button className="tag" style={{ border: '1px solid var(--glass-border)', background: 'none', color: 'var(--accent-primary)', fontSize: '0.7rem', cursor: 'pointer' }}>
+                        View
+                    </button>
+                </div>
+            </div>
+
+            <div className="glass-panel" style={{ padding: '20px' }}>
+                <h4 style={{ margin: '0 0 12px 0', fontSize: '0.85rem', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>Documents</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {['House Rules.pdf', 'Emergency Contacts.pdf', 'Appliance Manuals.pdf'].map(doc => (
+                        <div key={doc} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px', background: 'rgba(255,255,255,0.02)', borderRadius: '8px', cursor: 'pointer' }}>
+                            <span>📄</span>
+                            <span style={{ fontSize: '0.8rem', flex: 1 }}>{doc}</span>
+                            <span style={{ fontSize: '0.65rem', color: 'var(--accent-primary)' }}>Download</span>
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     );
@@ -284,7 +416,7 @@ const TenantPortal = ({ property, transactions = [] }) => {
                         </div>
                         <div>
                             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800 }}>{selectedUnit?.tenant || 'No Active Tenant'}</h3>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--accent-success)', fontWeight: 700 }}>{t('tenantPortal.activeLease')}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--accent-success)', fontWeight: 700 }}>{t('property.tenantPortal.activeLease')}</div>
                         </div>
                     </div>
                     {property.units && property.units.length > 1 && (
@@ -305,9 +437,11 @@ const TenantPortal = ({ property, transactions = [] }) => {
                 {/* Portal Tabs */}
                 <div style={{ display: 'flex', gap: '8px' }}>
                     {[
-                        { id: 'messaging', label: t('tenantPortal.messaging'), icon: '💬' },
-                        { id: 'payments', label: t('tenantPortal.payments'), icon: '💵' },
-                        { id: 'maintenance', label: t('tenantPortal.maintenance'), icon: '🛠️' }
+                        { id: 'dashboard', label: t('property.tenantPortal.dashboard'), icon: '🏠' },
+                        { id: 'messaging', label: t('property.tenantPortal.messaging'), icon: '💬' },
+                        { id: 'payments', label: t('property.tenantPortal.payments'), icon: '💵' },
+                        { id: 'maintenance', label: t('property.tenantPortal.maintenance'), icon: '🛠️' },
+                        { id: 'documents', label: 'Docs', icon: '📄' }
                     ].map(tab => (
                         <button
                             key={tab.id}
@@ -338,9 +472,11 @@ const TenantPortal = ({ property, transactions = [] }) => {
 
             {/* Content Area */}
             <div style={{ padding: '20px' }}>
+                {activeSection === 'dashboard' && renderDashboard()}
                 {activeSection === 'messaging' && renderMessaging()}
                 {activeSection === 'payments' && renderPayments()}
                 {activeSection === 'maintenance' && renderMaintenance()}
+                {activeSection === 'documents' && renderDocuments()}
             </div>
         </div>
     );

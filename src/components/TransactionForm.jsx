@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { validateForm } from '../utils/validators';
+import TagInput from './TagInput'; // [NEW]
 
 const TransactionForm = ({ onSubmit, onClose, initialData, vendors = [] }) => {
     const { t } = useLanguage();
@@ -10,6 +11,7 @@ const TransactionForm = ({ onSubmit, onClose, initialData, vendors = [] }) => {
     const [date, setDate] = useState(initialData?.date || new Date().toISOString().split('T')[0]);
     const [vendorId, setVendorId] = useState(initialData?.vendorId || '');
     const [expenseType, setExpenseType] = useState(initialData?.expenseType || 'opex');
+    const [tags, setTags] = useState(initialData?.tags || []); // [NEW]
 
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
@@ -38,7 +40,8 @@ const TransactionForm = ({ onSubmit, onClose, initialData, vendors = [] }) => {
             expenseType: category === 'Rent' ? null : expenseType,
             description,
             vendorId: category === 'Rent' ? null : vendorId,
-            date: date || new Date().toISOString()
+            date: date || new Date().toISOString(),
+            tags // [NEW]
         });
         setAmount('');
         setDescription('');
@@ -192,6 +195,12 @@ const TransactionForm = ({ onSubmit, onClose, initialData, vendors = [] }) => {
                                 background: 'rgba(255,255,255,0.05)', border: '1px solid var(--glass-border)', borderRadius: '12px', color: 'white', outline: 'none'
                             }}
                         />
+                    </div>
+
+                    {/* [NEW] Tags Section */}
+                    <div>
+                        <label style={{ display: 'block', color: 'var(--text-secondary)', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase' }}>{t('common.tags')}</label>
+                        <TagInput tags={tags} onChange={setTags} />
                     </div>
 
                     <div style={{ display: 'flex', gap: '12px', marginTop: '12px' }}>

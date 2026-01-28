@@ -38,14 +38,16 @@ This document is the single source of truth for how deployments and operations s
 - Triggers on changes to `firestore.rules`, `firestore.indexes.json`, or `firebase.json` in `main`.
 - Uses `FIREBASE_SERVICE_ACCOUNT` and `FIREBASE_PROJECT_ID` secrets.
 
-## 11) Backup & Export Policy (P1.4)
-- **Schedule**: Weekly full Firestore export.
-- **Responsibility**: Admin / PMC.
-- **Storage**: Multi-provider (GDrive, S3, or physical encrypted drive).
-- **Verification**: Restoration test must be performed **once a month**.
-- **Execution**: 
-  - Use `app/scripts/export_firestore.cjs`.
-  - Ensure `FIREBASE_SERVICE_ACCOUNT` is set in the local/CI environment.
+## 7) Backup & Export Policy (P1.4 - Best Practice)
+- **Method**: Firestore Managed Export to **Google Cloud Storage (GCS)**.
+- **Schedule**: Weekly (Cloud Scheduler cron: `0 0 * * 0`).
+- **Retention**: **90 days** (enforced via GCS Lifecycle Policy).
+- **Automation Details**:
+  - **Service Account**: Create a service account with `Cloud Datastore Import Export Admin` and `Storage Object Admin`.
+  - **Command**: `gcloud firestore export gs://[BUCKET_NAME] --collection-ids="..."` (optional).
+  - **Cloud Scheduler**: POST request to the Firestore API.
+- **Verification**: Restoration test into a staging project **once a month**.
+- **Reference**: Full policy at [backup_restore_policy.md](file:///Users/v.goncharov/Proga/lk%20property/docs/backup_restore_policy.md).
 ## 8) Observability & Auditing (P1.1)
 - **Log Store**: Firestore `system_logs` collection.
 - **Mandatory Fields**: 

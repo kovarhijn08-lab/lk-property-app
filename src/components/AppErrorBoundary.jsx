@@ -1,6 +1,7 @@
 import React from 'react';
 import { auth } from '../firebase/config';
 import { skynet } from '../utils/SkynetLogger';
+import { translations } from '../translations';
 
 class AppErrorBoundary extends React.Component {
     constructor(props) {
@@ -22,8 +23,22 @@ class AppErrorBoundary extends React.Component {
             stack: error.stack,
             componentStack: errorInfo?.componentStack,
             userId: auth.currentUser?.uid,
-            email: auth.currentUser?.email
+            email: auth.currentUser?.email,
+            env: 'production'
         });
+    }
+
+    // Helper for localization since this component is outside the functional hook scope
+    t(key) {
+        // Fallback translation logic for when hooks are not available
+        const lang = localStorage.getItem('pocket_ledger_lang') || 'ru';
+        const keys = key.split('.');
+        let val = translations[lang];
+        for (const k of keys) {
+            if (val && val[k]) val = val[k];
+            else return key;
+        }
+        return val;
     }
 
     handleReset = () => {
@@ -52,10 +67,10 @@ class AppErrorBoundary extends React.Component {
                         <div className="glass-panel" style={{ maxWidth: '400px', padding: '40px' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '20px' }}>⏳</div>
                             <h1 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: '16px' }}>
-                                Ошибка, мы уже работаем над ней!
+                                {this.t('safeMode.workingOnIt')}
                             </h1>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
-                                Пожалуйста, попробуйте обновить страницу позже.
+                                {this.t('safeMode.pleaseRefresh')}
                             </p>
                             <button
                                 onClick={() => window.location.reload()}
@@ -64,7 +79,7 @@ class AppErrorBoundary extends React.Component {
                                     border: '1px solid var(--glass-border)', color: 'white', borderRadius: '10px', cursor: 'pointer'
                                 }}
                             >
-                                Обновить страницу
+                                {this.t('admin.refresh')}
                             </button>
                         </div>
                     </div>
@@ -111,10 +126,10 @@ class AppErrorBoundary extends React.Component {
 
                         <div>
                             <h1 style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '12px' }}>
-                                Project Healer: Анализ сбоя
+                                {this.t('safeMode.crashTitle')}
                             </h1>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
-                                Зафиксирована критическая ошибка. Техническая информация сохранена для анализа.
+                                {this.t('safeMode.crashSub')}
                             </p>
                         </div>
 
@@ -149,10 +164,10 @@ class AppErrorBoundary extends React.Component {
                                     fontSize: '0.85rem'
                                 }}
                             >
-                                Сбросить и исправить
+                                {this.t('safeMode.wipeCache')}
                             </button>
                             <button
-                                onClick={() => window.location.href = '/'}
+                                onClick={() => window.location.reload()}
                                 style={{
                                     padding: '14px 20px',
                                     background: 'rgba(255,255,255,0.05)',
@@ -163,7 +178,7 @@ class AppErrorBoundary extends React.Component {
                                     cursor: 'pointer'
                                 }}
                             >
-                                Dashboard
+                                {this.t('admin.refresh')}
                             </button>
                         </div>
                     </div>

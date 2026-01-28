@@ -3,10 +3,10 @@
 > Goal: enterprise‑grade security, auditability, and compliance readiness.
 
 ## 1) Access Control & RBAC
-- [ ] Roles and permissions are defined in a single source of truth.
-- [ ] No client‑side role changes (server‑side only).
-- [ ] Admin actions are audited (who/what/when).
-- [ ] Ghost Mode access is restricted, logged, and time‑boxed.
+- [x] Roles and permissions are defined in a single source of truth (`AuthContext.js` / Firestore).
+- [x] No client‑side role changes (server‑side only via Admin Dashboard -> API).
+- [x] Admin actions are audited (who/what/when via `skynet.log`).
+- [x] Ghost Mode access is restricted, logged, and time‑boxed.
 - [ ] Least‑privilege defaults for all new users.
 
 ## 2) Authentication & Sessions
@@ -30,7 +30,7 @@
 ## 5) Observability & Logging
 - [x] Structured logging with mandatory fields: `timestamp`, `severity`, `actorId`, `action`, `entityType`, `entityId`, `source`, `env`, `sessionId`.
 - [x] Server-side logging to Firestore `system_logs` for all critical user and system actions.
-- [ ] Alerting configured (Telegram/Email) for P0 incidents.
+- [x] Alerting configured (Telegram) for P0 incidents via `TelegramRelay`.
 - [ ] Rate limiting on log ingestion.
 
 ## 6) Self‑Healing / Resilience

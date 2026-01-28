@@ -3,7 +3,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { BellIcon, InfoIcon } from './Icons';
 import { useMobile } from '../hooks/useMobile';
 
-const Layout = ({ children, onOpenSettings, user, onLogout, onOpenDrawer, onOpenNotifications, notificationCount = 0 }) => {
+const Layout = ({ children, onOpenSettings, user, onLogout, onOpenDrawer, onOpenNotifications, onOpenSearch, notificationCount = 0 }) => {
   const { t } = useLanguage();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const userMenuRef = useRef(null);
@@ -96,6 +96,32 @@ const Layout = ({ children, onOpenSettings, user, onLogout, onOpenDrawer, onOpen
           </div>
 
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            {/* Search Button */}
+            {onOpenSearch && (
+              <button
+                onClick={onOpenSearch}
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  cursor: 'pointer',
+                  color: 'white',
+                  padding: '10px 12px',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                title="Search (Cmd+K)"
+              >
+                🔍
+                {!isMobile && <span style={{ fontSize: '0.7rem', opacity: 0.5 }}>⌘K</span>}
+              </button>
+            )}
+
             {/* Notification Bell */}
             {onOpenNotifications && (
               <button

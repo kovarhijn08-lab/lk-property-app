@@ -219,3 +219,18 @@ export const FolderIcon = (props) => (
         <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
     </IconBase>
 );
+
+export const ActivityIcon = (props) => (
+    <IconBase {...props}>
+        <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </IconBase>
+);
+
+export const PieChartIcon = (props) => (
+    <IconBase {...props}>
+        <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
+        <path d="M22 12A10 10 0 0 0 12 2v10z" />
+    </IconBase>
+);
+
+export const TrendingUpIcon = TrendUpIcon;

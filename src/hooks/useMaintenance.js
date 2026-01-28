@@ -44,9 +44,11 @@ export const useMaintenance = (propertyId, userId) => {
 
         if (response.success) {
             skynet.log(`Maintenance request created: ${requestData.title}`, 'info', {
-                userId,
-                propertyId,
-                type: 'maintenance_request'
+                actorId: userId,
+                action: 'maintenance_request.create',
+                entityType: 'property',
+                entityId: propertyId,
+                metadata: { requestId, title: requestData.title }
             });
         }
 
@@ -64,9 +66,11 @@ export const useMaintenance = (propertyId, userId) => {
 
         if (response.success) {
             skynet.log(`Maintenance request status updated: ${requestId} -> ${newStatus}`, 'info', {
-                userId,
-                requestId,
-                type: 'maintenance_update'
+                actorId: userId,
+                action: 'maintenance_request.update',
+                entityType: 'maintenance_request',
+                entityId: requestId,
+                metadata: { newStatus }
             });
         }
 

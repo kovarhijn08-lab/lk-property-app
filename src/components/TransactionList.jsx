@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { TrashIcon, EditIcon, DollarIcon, ExportIcon } from './Icons';
 import EmptyState from './EmptyState';
+import FilterBar from './FilterBar'; // [NEW]
+import { getUniqueTags, getTagColor, matchTags } from '../utils/tagUtils'; // [NEW]
 
 const TransactionList = ({ transactions, onUpdate, onDelete }) => {
     const { t } = useLanguage();
@@ -9,6 +11,7 @@ const TransactionList = ({ transactions, onUpdate, onDelete }) => {
     const [editAmount, setEditAmount] = useState('');
     const [filter, setFilter] = useState('all'); // 'all', 'income', 'expense'
     const [dateRange, setDateRange] = useState('all'); // 'all', 'month', 'ytd'
+    const [selectedTags, setSelectedTags] = useState([]); // [NEW]
 
     const handleEdit = (tx) => {
         setEditingTx(tx.id);
@@ -37,6 +40,11 @@ const TransactionList = ({ transactions, onUpdate, onDelete }) => {
         const startOfYear = new Date(now.getFullYear(), 0, 1);
         filtered = filtered.filter(t => new Date(t.date) >= startOfYear);
     }
+
+    // [NEW] Filter by tags
+    filtered = filtered.filter(t => matchTags(t, selectedTags));
+
+    const availableTags = getUniqueTags(transactions);
 
     const getTypeColor = (category) => category === 'Rent' ? 'var(--accent-success)' : 'var(--accent-danger)';
 
@@ -123,6 +131,17 @@ const TransactionList = ({ transactions, onUpdate, onDelete }) => {
                 </div>
             </div>
 
+            {/* [NEW] Filter Bar Integration */}
+            <FilterBar
+                availableTags={availableTags}
+                selectedTags={selectedTags}
+                onTagToggle={(tag) => {
+                    setSelectedTags(prev =>
+                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+                    );
+                }}
+            />
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {filtered.map(tx => (
                     <div key={tx.id} className="tx-item" style={{
@@ -154,6 +173,27 @@ const TransactionList = ({ transactions, onUpdate, onDelete }) => {
                             <div>
                                 <div style={{ fontWeight: 800, color: 'white', fontSize: '1rem', letterSpacing: '-0.3px' }}>{tx.category === 'Rent' ? t('finance.rentIncome') : tx.category}</div>
                                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: 600, opacity: 0.8 }}>{tx.date}</div>
+
+                                {/* [NEW] Tags Display */}
+                                {tx.tags && tx.tags.length > 0 && (
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                                        {tx.tags.map(tag => (
+                                            <span
+                                                key={tag}
+                                                style={{
+                                                    background: getTagColor(tag),
+                                                    fontSize: '0.6rem',
+                                                    padding: '1px 6px',
+                                                    borderRadius: '4px',
+                                                    color: 'white',
+                                                    fontWeight: 700
+                                                }}
+                                            >
+                                                #{tag}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

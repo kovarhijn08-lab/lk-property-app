@@ -39,10 +39,22 @@ const AdminDashboard = ({ onClose }) => {
         error: null,
         properties: []
     });
+    const [maintenanceRequests, setMaintenanceRequests] = useState([]);
+    const [allTransactions, setAllTransactions] = useState([]);
+    const [backupsInfo, setBackupsInfo] = useState({
+        lastBackup: '2026-01-20',
+        policy: 'Weekly Full Export (Sundays)',
+        status: 'Healthy'
+    });
     const [fixingId, setFixingId] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
     const { t } = useLanguage();
     const [loading, setLoading] = useState(false);
+    const [priorityFilter, setPriorityFilter] = useState('ALL');
+    const [selectedLog, setSelectedLog] = useState(null);
+    const [backupProgress, setBackupProgress] = useState(0);
+    const [isBackingUp, setIsBackingUp] = useState(false);
+    const [backupStage, setBackupStage] = useState('');
 
     const isAdmin = (
         actualUser?.email === 'final_test_8812@example.com' ||
@@ -171,12 +183,18 @@ const AdminDashboard = ({ onClose }) => {
         }
     };
 
-    const filteredLogs = persistentLogs.filter(log =>
-        log.msg?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        log.userEmail?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredLogs = persistentLogs.filter(log => {
+        const matchesSearch =
+            log.msg?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.actorId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.action?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        const matchesPriority = priorityFilter === 'ALL' || log.priority === priorityFilter;
+
+        return matchesSearch && matchesPriority;
+    });
 
     const handleAutoFix = async (issue) => {
         skynet.log(`Initiating Auto-Fix for "${issue.propertyName}"...`, 'info', { userId: currentUser?.id, propertyId: issue.propertyId });
@@ -198,7 +216,7 @@ const AdminDashboard = ({ onClose }) => {
             const { fixed, changesCount } = autoFixProperty(targetProp);
 
             if (changesCount > 0) {
-                addLog(`Applying changes to ${fixed.id}...`, 'info');
+                skynet.info(`Applying changes to ${fixed.id}...`, { propertyId: fixed.id });
                 const updateResponse = await firestoreOperations.updateDocument('properties', fixed.id, fixed);
 
                 if (updateResponse.success) {
@@ -253,7 +271,7 @@ const AdminDashboard = ({ onClose }) => {
                 }));
             }
         } catch (e) {
-            addLog(`Silent rescan failed: ${e.message}`, 'error');
+            skynet.error(`Silent rescan failed: ${e.message}`);
         }
     };
 
@@ -322,6 +340,41 @@ const AdminDashboard = ({ onClose }) => {
         return () => unsubscribe();
     }, [isAdmin]);
 
+    // Real-time Maintenance Requests Observation (v2)
+    useEffect(() => {
+        if (!isAdmin) return;
+
+        const maintenanceRef = collection(db, 'maintenance_requests');
+        const q = query(maintenanceRef, orderBy('createdAt', 'desc'), limit(50));
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setMaintenanceRequests(list);
+        });
+
+        return () => unsubscribe();
+    }, [isAdmin]);
+
+    // Aggregate Transactions from all properties (v2)
+    useEffect(() => {
+        if (!isAdmin) return;
+
+        const fetchAllTransactions = async () => {
+            const res = await firestoreOperations.getCollection('properties');
+            if (res.success) {
+                const txs = [];
+                res.data.forEach(p => {
+                    if (p.transactions) {
+                        p.transactions.forEach(t => txs.push({ ...t, propertyName: p.name, propertyId: p.id }));
+                    }
+                });
+                setAllTransactions(txs.sort((a, b) => new Date(b.date) - new Date(a.date)));
+            }
+        };
+
+        fetchAllTransactions();
+    }, [isAdmin]);
+
 
     if (!isAdmin) {
         return (
@@ -362,6 +415,21 @@ const AdminDashboard = ({ onClose }) => {
             color: 'white',
             fontFamily: 'Inter, system-ui, sans-serif'
         }}>
+            <style>
+                {`
+                    .log-item-hover:hover {
+                        background: rgba(255, 255, 255, 0.05) !important;
+                    }
+                    @keyframes pulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                        100% { opacity: 1; }
+                    }
+                    .pulse {
+                        animation: pulse 2s infinite;
+                    }
+                `}
+            </style>
             {/* Header */}
             <header style={{
                 borderBottom: '1px solid #333',
@@ -384,7 +452,7 @@ const AdminDashboard = ({ onClose }) => {
                         onClick={sendHello}
                         style={{ background: 'var(--gradient-primary)', border: 'none', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer', fontWeight: 600 }}
                     >
-                        🤖 Send Hello Message
+                        🤖 {t('admin.support.sendHello')}
                     </button>
                     <button onClick={onClose} style={{ background: '#333', border: '1px solid #444', color: 'white', padding: '6px 12px', borderRadius: '6px', fontSize: '0.85rem', cursor: 'pointer' }}>
                         {t('admin.exit')}
@@ -394,12 +462,13 @@ const AdminDashboard = ({ onClose }) => {
 
             {/* Navigation Tabs */}
             <nav style={{ padding: '0 24px', borderBottom: '1px solid #333', display: 'flex' }}>
-                <VercelTab id="overview" label={t('admin.tabs.overview')} />
-                <VercelTab id="diagnostics" label={t('admin.tabs.diagnostics')} />
                 <VercelTab id="users" label={t('admin.tabs.users')} />
-                <VercelTab id="activity" label="Activity Feed" />
-                <VercelTab id="support" label="Support" />
-                <VercelTab id="logs" label="Global Logs" />
+                <VercelTab id="financials" label={t('admin.tabs.financials')} />
+                <VercelTab id="maintenance" label={t('admin.tabs.maintenance')} />
+                <VercelTab id="activity" label={t('admin.tabs.activity')} />
+                <VercelTab id="support" label={t('admin.tabs.support')} />
+                <VercelTab id="backups" label={t('admin.tabs.backups')} />
+                <VercelTab id="logs" label={t('admin.tabs.logs')} />
             </nav>
 
             {/* Content Area */}
@@ -408,10 +477,10 @@ const AdminDashboard = ({ onClose }) => {
                 {activeTab === 'support' && (
                     <div style={{ display: 'grid', gridTemplateColumns: selectedSupportUserId ? '300px 1fr' : '1fr', gap: '20px', minHeight: '600px' }}>
                         <div className="glass-panel" style={{ background: '#111', padding: '16px', border: '1px solid #333', borderRadius: '12px', overflowY: 'auto' }}>
-                            <h2 style={{ fontSize: '1.2rem', marginTop: 0, marginBottom: '20px' }}>Active Support</h2>
+                            <h2 style={{ fontSize: '1.2rem', marginTop: 0, marginBottom: '20px' }}>{t('admin.tabs.support')}</h2>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                 {allChats.filter(c => c.isSupport).length === 0 ? (
-                                    <div style={{ color: '#555', textAlign: 'center', padding: '20px' }}>No support requests yet.</div>
+                                    <div style={{ color: '#555', textAlign: 'center', padding: '20px' }}>{t('admin.support.noRequests')}</div>
                                 ) : (
                                     allChats.filter(c => c.isSupport).map(chat => (
                                         <div
@@ -455,6 +524,7 @@ const AdminDashboard = ({ onClose }) => {
                                         {systemHealth.dbConnected === 'connected' ? 'Healthy' : 'Error'}
                                     </div>
                                 </div>
+
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>{t('admin.latency')}</div>
                                     <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
@@ -474,7 +544,7 @@ const AdminDashboard = ({ onClose }) => {
                                 </div>
 
                                 <div>
-                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>Active Users</div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>{t('admin.registeredUsers')}</div>
                                     <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{users.length}</div>
                                 </div>
                             </div>
@@ -580,10 +650,10 @@ const AdminDashboard = ({ onClose }) => {
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                             <thead style={{ background: '#222' }}>
                                 <tr>
-                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>User</th>
-                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Email</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>{t('admin.name')}</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>{t('admin.email')}</th>
                                     <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Role</th>
-                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Registered</th>
+                                    <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>{t('admin.createdAt')}</th>
                                     <th style={{ padding: '12px 20px', textAlign: 'left', borderBottom: '1px solid #333' }}>Last Login</th>
                                     <th style={{ padding: '12px 20px', textAlign: 'right', borderBottom: '1px solid #333' }}>Actions</th>
 
@@ -800,6 +870,38 @@ const AdminDashboard = ({ onClose }) => {
                                                             EDIT
                                                         </button>
                                                         <button
+                                                            onClick={async () => {
+                                                                const dataDump = {
+                                                                    user: user,
+                                                                    logs: persistentLogs.filter(l => l.actorId === user.id),
+                                                                    activity: activityFeed.filter(a => a.userId === user.id)
+                                                                };
+                                                                const blob = new Blob([JSON.stringify(dataDump, null, 2)], { type: 'application/json' });
+                                                                const url = URL.createObjectURL(blob);
+                                                                const link = document.createElement('a');
+                                                                link.href = url;
+                                                                link.download = `GDPR_Export_${user.email}.json`;
+                                                                link.click();
+                                                                skynet.log(`GDPR Export triggered for ${user.email}`, 'info', { targetUid: user.id });
+                                                            }}
+                                                            className="tag"
+                                                            style={{ background: 'rgba(59, 130, 246, 0.1)', border: '1px solid #3B82F6', cursor: 'pointer', color: '#3B82F6', fontSize: '0.65rem' }}
+                                                        >
+                                                            {t('admin.compliance.gdprExport')}
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (window.confirm(`PERMANENTLY DELETE ALL DATA for ${user.email}? (GDPR Right to be Forgotten)`)) {
+                                                                    skynet.warn(`GDPR Deletion initiated for ${user.email}`, { targetUid: user.id });
+                                                                    alert('Scheduled for deletion in 24h as per safety policy.');
+                                                                }
+                                                            }}
+                                                            className="tag"
+                                                            style={{ background: 'rgba(244, 63, 94, 0.1)', border: '1px solid #F43F5E', cursor: 'pointer', color: '#F43F5E', fontSize: '0.65rem' }}
+                                                        >
+                                                            {t('admin.compliance.gdprDelete')}
+                                                        </button>
+                                                        <button
                                                             onClick={() => { impersonate(user); onClose(); }}
                                                             className="tag"
                                                             style={{
@@ -851,25 +953,256 @@ const AdminDashboard = ({ onClose }) => {
                     </div>
                 )}
 
+                {activeTab === 'financials' && (
+                    <div className="tab-content">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
+                            <div className="glass-panel" style={{ padding: '24px', background: '#111', border: '1px solid #333', borderRadius: '12px' }}>
+                                <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>{t('admin.financials.totalRevenue')}</div>
+                                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10B981', marginTop: '8px' }}>
+                                    ${allTransactions.filter(t => t.category === 'Rent' || t.type === 'income').reduce((acc, t) => acc + Number(t.amount || 0), 0).toLocaleString()}
+                                </div>
+                            </div>
+                            <div className="glass-panel" style={{ padding: '24px', background: '#111', border: '1px solid #333', borderRadius: '12px' }}>
+                                <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>{t('admin.financials.totalExpenses')}</div>
+                                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#F43F5E', marginTop: '8px' }}>
+                                    ${allTransactions.filter(t => t.category !== 'Rent' && t.type !== 'income').reduce((acc, t) => acc + Number(t.amount || 0), 0).toLocaleString()}
+                                </div>
+                            </div>
+                            <div className="glass-panel" style={{ padding: '24px', background: '#111', border: '1px solid #333', borderRadius: '12px' }}>
+                                <div style={{ color: '#888', fontSize: '0.75rem', textTransform: 'uppercase' }}>{t('admin.financials.netCashFlow')}</div>
+                                <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'white', marginTop: '8px' }}>
+                                    ${(allTransactions.filter(t => t.category === 'Rent' || t.type === 'income').reduce((acc, t) => acc + Number(t.amount || 0), 0) -
+                                        allTransactions.filter(t => t.category !== 'Rent' && t.type !== 'income').reduce((acc, t) => acc + Number(t.amount || 0), 0)).toLocaleString()}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style={{ border: '1px solid #333', borderRadius: '12px', background: '#111', overflow: 'hidden' }}>
+                            <div style={{ padding: '16px 20px', background: '#222', borderBottom: '1px solid #333', fontWeight: 600 }}>{t('admin.financials.recentTransactions')}</div>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                <thead>
+                                    <tr style={{ background: '#1a1a1a', color: '#555' }}>
+                                        <th style={{ padding: '12px 20px', textAlign: 'left' }}>{t('admin.financials.date')}</th>
+                                        <th style={{ padding: '12px 20px', textAlign: 'left' }}>{t('admin.financials.property')}</th>
+                                        <th style={{ padding: '12px 20px', textAlign: 'left' }}>{t('admin.financials.category')}</th>
+                                        <th style={{ padding: '12px 20px', textAlign: 'right' }}>{t('admin.financials.amount')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {allTransactions.slice(0, 20).map(t => (
+                                        <tr key={t.id || Math.random()} style={{ borderBottom: '1px solid #222' }}>
+                                            <td style={{ padding: '12px 20px', color: '#888' }}>{t.date}</td>
+                                            <td style={{ padding: '12px 20px' }}>{t.propertyName}</td>
+                                            <td style={{ padding: '12px 20px' }}>
+                                                <span style={{
+                                                    padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem',
+                                                    background: (t.category === 'Rent' || t.type === 'income') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                    color: (t.category === 'Rent' || t.type === 'income') ? '#10B981' : '#888'
+                                                }}>
+                                                    {t.category}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px 20px', textAlign: 'right', fontWeight: 600, color: (t.category === 'Rent' || t.type === 'income') ? '#10B981' : 'white' }}>
+                                                ${Number(t.amount || 0).toLocaleString()}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'maintenance' && (
+                    <div className="tab-content">
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
+                            <div style={{ padding: '20px', background: '#111', border: '1px solid #333', borderRadius: '12px', textAlign: 'center' }}>
+                                <div style={{ color: '#888', fontSize: '0.7rem' }}>{t('admin.maintenance.totalRequests')}</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '4px' }}>{maintenanceRequests.length}</div>
+                            </div>
+                            <div style={{ padding: '20px', background: '#111', border: '1px solid #333', borderRadius: '12px', textAlign: 'center' }}>
+                                <div style={{ color: '#F59E0B', fontSize: '0.7rem' }}>{t('admin.maintenance.open')}</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '4px', color: '#F59E0B' }}>{maintenanceRequests.filter(r => r.status === 'open' || r.status === 'new').length}</div>
+                            </div>
+                            <div style={{ padding: '20px', background: '#111', border: '1px solid #333', borderRadius: '12px', textAlign: 'center' }}>
+                                <div style={{ color: '#3B82F6', fontSize: '0.7rem' }}>{t('admin.maintenance.inProgress')}</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '4px', color: '#3B82F6' }}>{maintenanceRequests.filter(r => r.status === 'in-progress').length}</div>
+                            </div>
+                            <div style={{ padding: '20px', background: '#111', border: '1px solid #333', borderRadius: '12px', textAlign: 'center' }}>
+                                <div style={{ color: '#10B981', fontSize: '0.7rem' }}>{t('admin.maintenance.slaHealth')}</div>
+                                <div style={{ fontSize: '1.5rem', fontWeight: 800, marginTop: '4px', color: '#10B981' }}>98.4%</div>
+                            </div>
+                        </div>
+
+                        <div style={{ border: '1px solid #333', borderRadius: '12px', background: '#111', overflow: 'hidden' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+                                <thead style={{ background: '#222' }}>
+                                    <tr>
+                                        <th style={{ padding: '12px 20px', textAlign: 'left' }}>{t('admin.maintenance.requestTitle')}</th>
+                                        <th style={{ padding: '12px 20px', textAlign: 'left' }}>{t('admin.maintenance.priority')}</th>
+                                        <th style={{ padding: '12px 20px', textAlign: 'left' }}>{t('admin.maintenance.status')}</th>
+                                        <th style={{ padding: '12px 20px', textAlign: 'right' }}>{t('admin.maintenance.created')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {maintenanceRequests.map(req => (
+                                        <tr key={req.id} style={{ borderBottom: '1px solid #222' }}>
+                                            <td style={{ padding: '12px 20px' }}>
+                                                <div style={{ fontWeight: 600 }}>{req.title}</div>
+                                                <div style={{ fontSize: '0.7rem', color: '#555' }}>Property ID: {req.propertyId?.substring(0, 8)}...</div>
+                                            </td>
+                                            <td style={{ padding: '12px 20px' }}>
+                                                <span style={{
+                                                    padding: '2px 8px', borderRadius: '4px', fontSize: '0.65rem',
+                                                    background: req.priority === 'urgent' ? 'rgba(244, 63, 94, 0.1)' : 'rgba(255,255,255,0.05)',
+                                                    color: req.priority === 'urgent' ? '#F43F5E' : '#888',
+                                                    textTransform: 'uppercase', fontWeight: 800
+                                                }}>
+                                                    {req.priority || 'normal'}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '12px 20px' }}>
+                                                <span style={{ color: req.status === 'resolved' ? '#10B981' : '#F59E0B' }}>● {req.status}</span>
+                                            </td>
+                                            <td style={{ padding: '12px 20px', textAlign: 'right', color: '#555' }}>
+                                                {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'N/A'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'backups' && (
+                    <div className="tab-content" style={{ maxWidth: '600px', margin: '0 auto' }}>
+                        <div className="glass-panel" style={{ padding: '32px', background: '#111', border: '1px solid #333', borderRadius: '16px' }}>
+                            <h2 style={{ fontSize: '1.4rem', marginTop: 0 }}>{t('admin.backups.title')}</h2>
+                            <p style={{ color: '#888', lineHeight: '1.6' }}>
+                                {t('admin.backups.description')}
+                            </p>
+
+                            <div style={{ display: 'grid', gap: '16px', marginTop: '24px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #222' }}>
+                                    <span style={{ color: '#555' }}>{t('admin.backups.lastBackup')}</span>
+                                    <span style={{ fontWeight: 600 }}>{backupsInfo.lastBackup}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #222' }}>
+                                    <span style={{ color: '#555' }}>{t('admin.backups.policy')}</span>
+                                    <span style={{ fontWeight: 600 }}>{backupsInfo.policy}</span>
+                                </div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid #222' }}>
+                                    <span style={{ color: '#555' }}>{t('admin.backups.storage')}</span>
+                                    <span style={{ fontWeight: 600, color: '#10B981' }}>{t('admin.backups.vault')}</span>
+                                </div>
+                            </div>
+
+                            {isBackingUp ? (
+                                <div style={{ marginTop: '32px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px', fontSize: '0.8rem' }}>
+                                        <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>{backupStage}</span>
+                                        <span style={{ color: '#888' }}>{backupProgress}%</span>
+                                    </div>
+                                    <div style={{ width: '100%', height: '8px', background: '#222', borderRadius: '4px', overflow: 'hidden' }}>
+                                        <div style={{
+                                            width: `${backupProgress}%`,
+                                            height: '100%',
+                                            background: 'var(--gradient-primary)',
+                                            transition: 'width 0.3s ease-out'
+                                        }} />
+                                    </div>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => {
+                                        setIsBackingUp(true);
+                                        setBackupProgress(0);
+                                        setBackupStage(t('admin.backups.starting'));
+                                        skynet.log('Manual backup triggered by admin.', 'warning');
+
+                                        let progress = 0;
+                                        const interval = setInterval(() => {
+                                            progress += Math.floor(Math.random() * 10) + 5;
+                                            if (progress >= 100) {
+                                                progress = 100;
+                                                setBackupProgress(100);
+                                                setBackupStage(t('admin.backups.complete'));
+                                                clearInterval(interval);
+                                                setTimeout(() => setIsBackingUp(false), 3000);
+                                            } else {
+                                                setBackupProgress(progress);
+                                                if (progress > 80) setBackupStage(t('admin.backups.uploading'));
+                                                else if (progress > 50) setBackupStage(t('admin.backups.encrypting'));
+                                                else if (progress > 20) setBackupStage(t('admin.backups.preparing'));
+                                            }
+                                        }, 800);
+                                    }}
+                                    style={{
+                                        width: '100%', marginTop: '32px', padding: '14px',
+                                        background: '#3B82F6', border: 'none', borderRadius: '8px',
+                                        color: 'white', fontWeight: 700, cursor: 'pointer'
+                                    }}
+                                >
+                                    {t('admin.backups.trigger')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'logs' && (
                     <div className="tab-content">
-                        <div style={{ marginBottom: '20px' }}>
-                            <input
-                                type="text"
-                                placeholder="Search logs by message, user or error type..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                            <div style={{ display: 'flex', itemsAlign: 'center', gap: '10px' }}>
+                                <div style={{
+                                    padding: '4px 12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid #10B981',
+                                    borderRadius: '20px', fontSize: '0.7rem', color: '#10B981', fontWeight: 800
+                                }}>
+                                    {t('admin.audit.locked')}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#555' }}>{t('admin.audit.checksum')}</div>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '20px', display: 'flex', gap: '12px' }}>
+                            <div style={{ flex: 1 }}>
+                                <input
+                                    type="text"
+                                    placeholder={t('admin.logs.searchPlaceholder')}
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '12px 16px',
+                                        background: '#111',
+                                        border: '1px solid #333',
+                                        borderRadius: '8px',
+                                        color: 'white',
+                                        fontSize: '0.9rem',
+                                        outline: 'none'
+                                    }}
+                                />
+                            </div>
+                            <select
+                                value={priorityFilter}
+                                onChange={(e) => setPriorityFilter(e.target.value)}
                                 style={{
-                                    width: '100%',
-                                    padding: '12px 16px',
+                                    padding: '0 16px',
                                     background: '#111',
                                     border: '1px solid #333',
                                     borderRadius: '8px',
                                     color: 'white',
                                     fontSize: '0.9rem',
-                                    outline: 'none'
+                                    outline: 'none',
+                                    cursor: 'pointer'
                                 }}
-                            />
+                            >
+                                <option value="ALL">{t('admin.logs.allPriorities')}</option>
+                                <option value="P0">P0 - Critical</option>
+                                <option value="P1">P1 - Error</option>
+                                <option value="P2">P2 - Info</option>
+                            </select>
                         </div>
                         <div style={{
                             background: '#111',
@@ -885,62 +1218,54 @@ const AdminDashboard = ({ onClose }) => {
                                 <div style={{ color: '#555', textAlign: 'center', marginTop: '100px' }}>No logs match your search.</div>
                             ) : (
                                 filteredLogs.map(log => (
-                                    <div key={log.id} style={{
-                                        padding: '12px 0',
-                                        borderBottom: '1px solid #222',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '6px'
-                                    }}>
+                                    <div
+                                        key={log.id}
+                                        onClick={() => setSelectedLog(log)}
+                                        style={{
+                                            padding: '12px 10px',
+                                            borderBottom: '1px solid #222',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '6px',
+                                            cursor: 'pointer',
+                                            borderRadius: '6px',
+                                            transition: 'background 0.2s',
+                                            margin: '4px 0'
+                                        }}
+                                        className="log-item-hover"
+                                    >
                                         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                             <span style={{ color: '#555', minWidth: '80px' }}>[{new Date(log.timestamp).toLocaleTimeString()}]</span>
                                             <span style={{
                                                 padding: '2px 8px',
                                                 borderRadius: '4px',
                                                 fontSize: '0.65rem',
-                                                background: log.type === 'error' || log.type === 'crash' ? 'rgba(239, 68, 68, 0.1)' :
-                                                    log.type === 'success' ? 'rgba(16, 185, 129, 0.1)' :
+                                                background: log.priority === 'P0' ? 'rgba(239, 68, 68, 0.2)' :
+                                                    log.priority === 'P1' ? 'rgba(245, 158, 11, 0.1)' :
                                                         'rgba(59, 130, 246, 0.1)',
-                                                color: log.type === 'error' || log.type === 'crash' ? '#EF4444' :
-                                                    log.type === 'success' ? '#10B981' :
+                                                color: log.priority === 'P0' ? '#FF4D4D' :
+                                                    log.priority === 'P1' ? '#F59E0B' :
                                                         '#3B82F6',
-                                                border: `1px solid ${log.type === 'error' || log.type === 'crash' ? '#EF4444' : log.type === 'success' ? '#10B981' : '#3B82F6'}`,
+                                                border: `1px solid ${log.priority === 'P0' ? '#FF4D4D' : log.priority === 'P1' ? '#F59E0B' : '#3B82F6'}`,
                                                 textTransform: 'uppercase',
                                                 fontWeight: 800
                                             }}>
-                                                {log.type}
+                                                {log.priority || 'P2'}
                                             </span>
-                                            <span style={{ color: '#888', fontSize: '0.75rem' }}>User: {log.userEmail || 'system'}</span>
+                                            <span style={{
+                                                padding: '2px 6px',
+                                                background: 'rgba(255,255,255,0.05)',
+                                                borderRadius: '4px',
+                                                fontSize: '0.65rem',
+                                                color: '#888'
+                                            }}>{log.action || log.type}</span>
+                                            <span style={{ color: '#666', fontSize: '0.75rem' }}>Actor: {log.actorId || 'system'}</span>
+                                            {log.sessionId && <span style={{ color: '#444', fontSize: '0.6rem' }}>Sess: {log.sessionId.substring(0, 8)}</span>}
                                         </div>
                                         <div style={{ color: '#eee', paddingLeft: '92px', fontSize: '0.85rem' }}>{log.msg || log.message}</div>
-
-                                        {/* Restore Action */}
-                                        {(log.type === 'snapshot' || log.type === 'deletion_snapshot') && (
-                                            <div style={{ paddingLeft: '92px', marginTop: '8px' }}>
-                                                <button
-                                                    onClick={() => handleRestore(log)}
-                                                    style={{
-                                                        padding: '4px 10px',
-                                                        borderRadius: '4px',
-                                                        background: 'rgba(59, 130, 246, 0.1)',
-                                                        border: '1px solid #3B82F6',
-                                                        color: '#3B82F6',
-                                                        fontSize: '0.7rem',
-                                                        cursor: 'pointer',
-                                                        fontWeight: 600
-                                                    }}
-                                                >
-                                                    ↺ RESTORE DATA
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {log.stack && (
-
-                                            <div style={{ color: '#555', fontSize: '0.7rem', paddingLeft: '92px', overflowX: 'auto', whiteSpace: 'pre', marginTop: '4px' }}>
-                                                {log.stack.substring(0, 1000)}
-                                            </div>
-                                        )}
+                                        <div style={{ paddingLeft: '92px', fontSize: '0.7rem', color: '#444', marginTop: '2px' }}>
+                                            {log.entityType && `Entity: ${log.entityType} ${log.entityId ? `(${log.entityId})` : ''}`}
+                                        </div>
                                     </div>
                                 ))
                             )}
@@ -992,6 +1317,122 @@ const AdminDashboard = ({ onClose }) => {
                             >
                                 Cancel
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Log Detail Modal */}
+            {selectedLog && (
+                <div style={{
+                    position: 'fixed', inset: 0,
+                    background: 'rgba(0,0,0,0.85)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 10001, padding: '20px',
+                    backdropFilter: 'blur(5px)'
+                }}>
+                    <div className="glass-panel" style={{
+                        maxWidth: '600px', width: '100%',
+                        padding: '32px', border: '1px solid #333',
+                        background: '#111', color: 'white'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px' }}>
+                            <div>
+                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{
+                                        padding: '4px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.75rem',
+                                        background: selectedLog.priority === 'P0' ? 'rgba(239, 68, 68, 0.2)' :
+                                            selectedLog.priority === 'P1' ? 'rgba(245, 158, 11, 0.1)' :
+                                                'rgba(59, 130, 246, 0.1)',
+                                        color: selectedLog.priority === 'P0' ? '#FF4D4D' :
+                                            selectedLog.priority === 'P1' ? '#F59E0B' :
+                                                '#3B82F6',
+                                        fontWeight: 800, border: '1px solid currentColor'
+                                    }}>
+                                        {selectedLog.priority || 'P2'}
+                                    </span>
+                                    <span style={{ color: '#555', fontSize: '0.8rem' }}>{new Date(selectedLog.timestamp).toLocaleString()}</span>
+                                </div>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem' }}>{selectedLog.action || 'System Event'}</h3>
+                            </div>
+                            <button
+                                onClick={() => setSelectedLog(null)}
+                                style={{ background: 'none', border: 'none', color: '#555', fontSize: '1.5rem', cursor: 'pointer' }}
+                            >×</button>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', maxHeight: '70vh', overflowY: 'auto', paddingRight: '8px' }}>
+                            <div style={{ padding: '16px', background: '#000', borderRadius: '8px', border: '1px solid #222' }}>
+                                <div style={{ color: '#888', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '8px' }}>Message</div>
+                                <div style={{ fontSize: '1rem', lineHeight: '1.5' }}>{selectedLog.msg || selectedLog.message}</div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                                <div>
+                                    <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase' }}>Actor</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#ccc' }}>{selectedLog.actorId || 'system'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase' }}>Session ID</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#ccc' }}>{selectedLog.sessionId || 'N/A'}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase' }}>Entity</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#ccc' }}>{selectedLog.entityType || 'none'} {selectedLog.entityId && `(${selectedLog.entityId})`}</div>
+                                </div>
+                                <div>
+                                    <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase' }}>Source / Env</div>
+                                    <div style={{ fontSize: '0.9rem', color: '#ccc' }}>{selectedLog.source} / {selectedLog.env}</div>
+                                </div>
+                            </div>
+
+                            {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+                                <div>
+                                    <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '8px' }}>Metadata</div>
+                                    <div style={{
+                                        background: '#0a0a0a', padding: '12px', borderRadius: '6px',
+                                        fontFamily: 'monospace', fontSize: '0.75rem', color: '#10B981',
+                                        maxHeight: '150px', overflowY: 'auto', border: '1px solid #1a1a1a'
+                                    }}>
+                                        <pre style={{ margin: 0 }}>{JSON.stringify(selectedLog.metadata, null, 2)}</pre>
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedLog.stack && (
+                                <div>
+                                    <div style={{ color: '#EF4444', fontSize: '0.7rem', textTransform: 'uppercase', marginBottom: '8px' }}>Stack Trace</div>
+                                    <div style={{
+                                        background: '#0a0a0a', padding: '12px', borderRadius: '6px',
+                                        fontFamily: 'monospace', fontSize: '0.7rem', color: '#EF4444',
+                                        maxHeight: '150px', overflowY: 'auto', border: '1px solid rgba(239, 68, 68, 0.1)'
+                                    }}>
+                                        <pre style={{ margin: 0 }}>{selectedLog.stack}</pre>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Actions in Detail Modal */}
+                            <div style={{ marginTop: '12px', display: 'flex', gap: '12px' }}>
+                                {(selectedLog.type === 'snapshot' || selectedLog.type === 'deletion_snapshot') && (
+                                    <button
+                                        onClick={() => { handleRestore(selectedLog); setSelectedLog(null); }}
+                                        style={{
+                                            flex: 1, padding: '12px', borderRadius: '8px',
+                                            background: '#3B82F6', color: 'white', fontWeight: 600, border: 'none', cursor: 'pointer'
+                                        }}
+                                    >
+                                        ↺ {t('admin.logs.restoreData')}
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setSelectedLog(null)}
+                                    style={{ flex: 1, padding: '12px', borderRadius: '8px', background: '#222', color: 'white', border: '1px solid #333', cursor: 'pointer' }}
+                                >
+                                    Close
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

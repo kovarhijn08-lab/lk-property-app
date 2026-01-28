@@ -10,6 +10,8 @@ import {
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { skynet } from '../utils/SkynetLogger';
+import { firestoreOperations } from '../hooks/useFirestore';
+import { where } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -26,6 +28,14 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         let unsubscribeDoc = null;
+
+        // [SAFETY] Force loading to false if Firebase hangs for more than 8 seconds
+        const authTimeout = setTimeout(() => {
+            if (loading) {
+                console.warn('[AuthContext] Load timeout reached. Forcing UI render.');
+                setLoading(false);
+            }
+        }, 8000);
 
         const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
             if (unsubscribeDoc) {
@@ -80,6 +90,7 @@ export const AuthProvider = ({ children }) => {
         return () => {
             unsubscribeAuth();
             if (unsubscribeDoc) unsubscribeDoc();
+            clearTimeout(authTimeout);
         };
     }, []);
 
@@ -106,23 +117,102 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const signup = async (email, password, name) => {
-        const res = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(res.user, { displayName: name });
-        await setDoc(doc(db, 'users', res.user.uid), {
-            name,
-            email,
-            role: 'tenant',
-            createdAt: new Date().toISOString(),
-            preferences: { currency: 'USD', isDemoMode: false }
-        });
-        skynet.log(`New user registered: ${email} as tenant`, 'success', {
-            actorId: res.user.uid,
-            action: 'auth.signup',
-            entityType: 'user',
-            entityId: res.user.uid
-        });
-        return { success: true, user: res.user };
+    const signup = async (email, password, name, role = 'owner', inviteToken = null) => {
+        try {
+            let linkedPropertyId = null;
+            let linkedUnitId = null;
+
+            // 1. Invitation Validation for Tenants
+            if (role === 'tenant') {
+                if (!inviteToken) return { success: false, error: 'Registration for tenants requires an invitation link.' };
+
+                const inviteSnap = await firestoreOperations.getCollection('invitations', [
+                    where('token', '==', inviteToken),
+                    where('status', '==', 'active')
+                ]);
+
+                if (!inviteSnap.success || inviteSnap.data.length === 0) {
+                    return { success: false, error: 'Invalid or expired invitation link.' };
+                }
+
+                const inviteData = inviteSnap.data[0];
+                const inviteId = inviteData.id;
+
+                // Check expiry
+                if (new Date(inviteData.expiresAt) < new Date()) {
+                    await firestoreOperations.updateDocument('invitations', inviteId, { status: 'expired' });
+                    return { success: false, error: 'Invitation link has expired.' };
+                }
+
+                linkedPropertyId = inviteData.propertyId;
+                linkedUnitId = inviteData.unitId;
+
+                // Mark as used early or wait for success
+                await firestoreOperations.updateDocument('invitations', inviteId, {
+                    status: 'used',
+                    usedAt: new Date().toISOString()
+                });
+            }
+
+            // 2. Create Firebase User
+            const res = await createUserWithEmailAndPassword(auth, email, password);
+            await updateProfile(res.user, { displayName: name });
+
+            // 3. Create User Document
+            const userData = {
+                id: res.user.uid,
+                name,
+                email,
+                role: role,
+                onboardingCompleted: role === 'tenant', // Tenants skip onboarding for now
+                createdAt: new Date().toISOString(),
+                preferences: { currency: 'USD', isDemoMode: false },
+                linkedPropertyId,
+                linkedUnitId
+            };
+            await setDoc(doc(db, 'users', res.user.uid), userData);
+
+            // 4. Link Tenant to Property/Unit
+            if (role === 'tenant' && linkedPropertyId) {
+                const propDoc = await firestoreOperations.getDocument('properties', linkedPropertyId);
+                if (propDoc.success) {
+                    const propData = propDoc.data;
+
+                    // Add to property tenantIds
+                    const tenantIds = propData.tenantIds || [];
+                    if (!tenantIds.includes(res.user.uid)) {
+                        tenantIds.push(res.user.uid);
+                    }
+
+                    // Update unit if applicable
+                    let updatedUnits = propData.units || [];
+                    if (linkedUnitId) {
+                        updatedUnits = updatedUnits.map(u =>
+                            u.id === linkedUnitId ? { ...u, tenantId: res.user.uid, tenant: name } : u
+                        );
+                    }
+
+                    await firestoreOperations.updateDocument('properties', linkedPropertyId, {
+                        tenantIds,
+                        units: updatedUnits,
+                        tenantEmails: [...(propData.tenantEmails || []), email]
+                    });
+                }
+            }
+
+            skynet.log(`New user registered: ${email} as ${role}`, 'success', {
+                actorId: res.user.uid,
+                action: 'auth.signup',
+                entityType: 'user',
+                entityId: res.user.uid,
+                metadata: { role, linkedPropertyId }
+            });
+
+            return { success: true, user: res.user };
+        } catch (error) {
+            console.error('[AuthContext] Signup Error:', error);
+            return { success: false, error: error.message };
+        }
     };
 
     const logout = async () => {

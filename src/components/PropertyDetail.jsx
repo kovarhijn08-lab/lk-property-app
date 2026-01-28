@@ -12,8 +12,11 @@ import BookingForm from './BookingForm';
 import FinancialPlanner from './FinancialPlanner';
 import SideDrawer from './SideDrawer';
 import TenantPortal from './TenantPortal';
-import { EditIcon, TrashIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIcon, InfoIcon } from './Icons';
 import { validateForm } from '../utils/validators';
+import InviteManager from './InviteManager';
+import TagInput from './TagInput'; // [NEW]
+import { getTagColor } from '../utils/tagUtils'; // [NEW]
+import { EditIcon, TrashIcon, InfoIcon } from './Icons';
 
 const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors, onAddVendor, onDeleteVendor, initialTab = 'overview' }) => {
     const { t } = useLanguage();
@@ -25,6 +28,8 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
     const [editingBooking, setEditingBooking] = useState(null);
     const [bookingToDelete, setBookingToDelete] = useState(null);
     const [activeTab, setActiveTab] = useState(initialTab);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [selectedUnitId, setSelectedUnitId] = useState(null);
 
     // Edit Form State
     const [editedProp, setEditedProp] = useState({ ...property });
@@ -323,6 +328,15 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                             {renderFieldError('address', editedProp.address)}
                         </div>
 
+                        {/* [NEW] Tags Section */}
+                        <div>
+                            <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px', fontWeight: 700, textTransform: 'uppercase' }}>{t('common.tags')}</label>
+                            <TagInput
+                                tags={editedProp.tags || []}
+                                onChange={(newTags) => setEditedProp(prev => ({ ...prev, tags: newTags }))}
+                            />
+                        </div>
+
                         {/* Commercial Specific Settings */}
                         {editedProp.type === 'commercial' && (
                             <div style={{ borderTop: '1px solid var(--glass-border)', paddingTop: '20px', marginTop: '8px' }}>
@@ -475,6 +489,27 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                             {property.address && (
                                                 <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px' }}>
                                                     📍 {property.address}
+                                                </div>
+                                            )}
+
+                                            {/* [NEW] Tags Display */}
+                                            {property.tags && property.tags.length > 0 && (
+                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                    {property.tags.map(tag => (
+                                                        <span
+                                                            key={tag}
+                                                            style={{
+                                                                background: getTagColor(tag),
+                                                                fontSize: '0.7rem',
+                                                                padding: '4px 12px',
+                                                                borderRadius: '8px',
+                                                                color: 'white',
+                                                                fontWeight: 800
+                                                            }}
+                                                        >
+                                                            #{tag}
+                                                        </span>
+                                                    ))}
                                                 </div>
                                             )}
 
@@ -655,10 +690,34 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                                     </div>
                                                 </>
                                             ) : (
-                                                <TenantPortal
-                                                    property={property}
-                                                    transactions={property.transactions || []}
-                                                />
+                                                <>
+                                                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                                                        <button
+                                                            onClick={() => setShowInviteModal(!showInviteModal)}
+                                                            className="btn-primary"
+                                                            style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem' }}
+                                                        >
+                                                            {showInviteModal ? t('common.cancel') : '+ Invite Tenant'}
+                                                        </button>
+                                                    </div>
+
+                                                    {showInviteModal && (
+                                                        <div style={{ marginBottom: '24px' }}>
+                                                            <InviteManager
+                                                                propertyId={property.id}
+                                                                unitId={selectedUnitId}
+                                                                onInviteSent={() => {
+                                                                    // Optional: refresh or close
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    <TenantPortal
+                                                        property={property}
+                                                        transactions={property.transactions || []}
+                                                    />
+                                                </>
                                             )}
                                         </div>
                                     )}

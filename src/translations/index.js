@@ -18,7 +18,16 @@ export const translations = {
             construction: 'Under Construction',
             exportPdf: 'Export PDF',
             taxDocs: 'Tax Documents',
-            saveGoal: 'Goal Saved'
+            saveGoal: 'Goal Saved',
+            tags: 'Tags'
+        },
+        filters: {
+            title: 'Filters',
+            propertyType: 'Property Type',
+            status: 'Status',
+            occupancy: 'Occupancy',
+            addTag: 'Add tag...',
+            noTags: 'No tags available'
         },
         dashboard: {
             title: 'Portfolio Overview',
@@ -198,6 +207,7 @@ export const translations = {
             },
             tenantPortal: {
                 title: 'Tenant Portal',
+                dashboard: 'Dashboard',
                 messaging: 'Messaging',
                 payments: 'Payments',
                 maintenance: 'Maintenance',
@@ -208,7 +218,16 @@ export const translations = {
                 paymentHistory: 'Payment History',
                 maintenanceIssues: 'Maintenance Issues',
                 typeMessage: 'Type your message...',
-                selectUnit: 'Select Unit'
+                selectUnit: 'Select Unit',
+                nextAction: 'Next Action',
+                quickLinks: 'Quick Links',
+                propertySnapshot: 'My Property',
+                contactManager: 'Contact Manager',
+                qrCodeTip: 'Guest QR Access',
+                rentDueDetail: 'Rent payment is due by the 5th of this month.',
+                allSet: 'You are all set!',
+                noPendingActions: 'No urgent actions required.',
+                viewContract: 'View Contract'
             },
             diagnostics: 'Diagnostics'
         },
@@ -235,34 +254,89 @@ export const translations = {
             emailExample: 'e.g., name@example.com',
             diagnostics: 'Diagnostics'
         },
+        safeMode: {
+            title: 'System Protection Active',
+            description: 'The app encountered multiple failures during startup. This usually happens due to corrupted local data or network issues.',
+            tryRegular: 'Try Regular Mode',
+            wipeCache: 'Reset Cache (Wipe Data)',
+            loadingError: 'Problem loading data. Please refresh.',
+            enterSafe: 'Enter Safe Mode',
+            crashTitle: 'Project Healer: Crash Analysis',
+            crashSub: 'A critical error was recorded. Technical data has been saved for analysis.',
+            workingOnIt: 'An error occurred, we are already working on it!',
+            pleaseRefresh: 'Please try refreshing the page later.'
+        },
         admin: {
             title: 'Admin Control Center',
             exit: 'Exit Admin',
+            createdAt: 'Created At',
             tabs: {
                 overview: 'Overview',
                 diagnostics: 'Diagnostics',
                 users: 'Users',
-                logs: 'System Logs'
+                financials: 'Financials',
+                maintenance: 'Maintenance',
+                activity: 'Activity Feed',
+                support: 'Support',
+                backups: 'Backups',
+                logs: 'Global Logs'
             },
-            healerTitle: 'Project Healer: Deep Diagnostics',
-            healerSub: 'Automated data integrity check and error detection',
-            runCheck: 'Run Diagnostics',
-            scanning: 'Scanning...',
-            dataHealth: 'Data Integrity',
-            lastRun: 'Last Run',
-            healerStatus: 'Healer Status',
-            active: 'Active',
-            issuesFound: 'Issues Found',
-            fixAi: 'Fix AI',
-            systemStatus: 'System Health',
-            dbConnection: 'Database Connection',
-            latency: 'Latency',
-            registeredUsers: 'Registered Users',
-            refresh: 'Refresh',
-            id: 'ID',
-            name: 'Name',
-            email: 'Email',
-            createdAt: 'Created At'
+            financials: {
+                title: 'Financial Overview (Portfolio)',
+                totalRevenue: 'Total Revenue',
+                totalExpenses: 'Total Expenses',
+                netCashFlow: 'Net Cash Flow',
+                recentTransactions: 'Recent Transactions (Global)',
+                date: 'Date',
+                property: 'Property',
+                category: 'Category',
+                amount: 'Amount'
+            },
+            maintenance: {
+                title: 'Maintenance Monitoring',
+                totalRequests: 'Total Requests',
+                open: 'Open',
+                inProgress: 'In Progress',
+                slaHealth: 'SLA Health',
+                requestTitle: 'Title / Unit',
+                priority: 'Priority',
+                status: 'Status',
+                created: 'Created'
+            },
+            backups: {
+                title: 'System Persistence & Backups',
+                policyTitle: 'Backup Policy (v2.1)',
+                description: 'Our backup policy ensures 99.9% data durability. Databases are backed up weekly, with point-in-time recovery enabled.',
+                lastBackup: 'Last Backup Date',
+                policy: 'Backup Policy',
+                storage: 'Storage Env',
+                vault: 'Encrypted Vault',
+                trigger: 'Trigger Manual Full Export',
+                starting: 'Starting export sequence...',
+                preparing: 'Preparing data artifacts...',
+                encrypting: 'Encrypting vault...',
+                uploading: 'Uploading to persistence layer...',
+                complete: 'Backup Complete! ✨'
+            },
+            compliance: {
+                gdprExport: 'GDPR EXPORT',
+                gdprDelete: 'GDPR DELETE',
+                rightToBeForgotten: 'Right to be Forgotten'
+            },
+            support: {
+                noRequests: 'No support requests yet.',
+                sendHello: 'Send Hello Message'
+            },
+            audit: {
+                locked: 'AUDIT TRAIL: LOCKED (v3)',
+                checksum: 'Checksum verification active.'
+            },
+            logs: {
+                title: 'Global Security & Operations Logs',
+                searchPlaceholder: 'Search logs by message, actor, action...',
+                allPriorities: 'All Priorities',
+                restoreData: 'RESTORE DATA'
+            }
         },
         safeMode: {
             title: 'System Protection Active',
@@ -370,7 +444,16 @@ export const translations = {
             construction: 'Строится',
             exportPdf: 'Экспорт PDF',
             taxDocs: 'Налоговые Документы',
-            saveGoal: 'Цель сохранена'
+            saveGoal: 'Цель сохранена',
+            tags: 'Метки'
+        },
+        filters: {
+            title: 'Фильтры',
+            propertyType: 'Тип недвижимости',
+            status: 'Статус',
+            occupancy: 'Заполняемость',
+            addTag: 'Добавить метку...',
+            noTags: 'Нет доступных меток'
         },
         dashboard: {
             title: 'Обзор Портфеля',
@@ -550,6 +633,7 @@ export const translations = {
             },
             tenantPortal: {
                 title: 'Портал Арендатора',
+                dashboard: 'Обзор',
                 messaging: 'Сообщения',
                 payments: 'Платежи',
                 maintenance: 'Поддержка',
@@ -560,7 +644,16 @@ export const translations = {
                 paymentHistory: 'История платежей',
                 maintenanceIssues: 'Заявки на ремонт',
                 typeMessage: 'Введите сообщение...',
-                selectUnit: 'Выберите юнит'
+                selectUnit: 'Выберите юнит',
+                nextAction: 'Что сделать сейчас',
+                quickLinks: 'Быстрые действия',
+                propertySnapshot: 'Мой дом',
+                contactManager: 'Связаться с менеджером',
+                qrCodeTip: 'QR-код для гостей',
+                rentDueDetail: 'Арендная плата должна быть внесена до 5-го числа.',
+                allSet: 'Все в порядке!',
+                noPendingActions: 'Срочных дел нет.',
+                viewContract: 'Посмотреть договор'
             },
             diagnostics: 'Диагностика'
         },
@@ -591,31 +684,74 @@ export const translations = {
         admin: {
             title: 'Центр управления Admin',
             exit: 'Выйти',
+            createdAt: 'Дата регистрации',
             tabs: {
                 overview: 'Обзор',
                 diagnostics: 'Диагностика',
                 users: 'Пользователи',
-                logs: 'Логи системы'
+                financials: 'Финансы',
+                maintenance: 'Обслуживание',
+                activity: 'Активность',
+                support: 'Поддержка',
+                backups: 'Бэкапы',
+                logs: 'Глобальные логи'
             },
-            healerTitle: 'Project Healer: Глубокая диагностика',
-            healerSub: 'Автоматическая проверка целостности данных и поиск ошибок',
-            runCheck: 'Запустить проверку',
-            scanning: 'Сканирование...',
-            dataHealth: 'Целостность данных',
-            lastRun: 'Последний запуск',
-            healerStatus: 'Статус AI-лекаря',
-            active: 'Активен',
-            issuesFound: 'Обнаруженные проблемы',
-            fixAi: 'Исправить AI',
-            systemStatus: 'Статус системы',
-            dbConnection: 'Связь с базой данных',
-            latency: 'Задержка',
-            registeredUsers: 'Зарегистрированные пользователи',
-            refresh: 'Обновить',
-            id: 'ID',
-            name: 'Имя',
-            email: 'Email',
-            createdAt: 'Дата регистрации'
+            financials: {
+                title: 'Финансовый обзор (Портфель)',
+                totalRevenue: 'Общая выручка',
+                totalExpenses: 'Общие расходы',
+                netCashFlow: 'Чистый денежный поток',
+                recentTransactions: 'Последние транзакции (Глобально)',
+                date: 'Дата',
+                property: 'Объект',
+                category: 'Категория',
+                amount: 'Сумма'
+            },
+            maintenance: {
+                title: 'Мониторинг обслуживания',
+                totalRequests: 'Всего заявок',
+                open: 'Открыто',
+                inProgress: 'В процессе',
+                slaHealth: 'Здоровье SLA',
+                requestTitle: 'Название / Юнит',
+                priority: 'Приоритет',
+                status: 'Статус',
+                created: 'Создано'
+            },
+            backups: {
+                title: 'Отказоустойчивость и Бэкапы',
+                policyTitle: 'Политика бэкапов (v2.1)',
+                description: 'Наша политика бэкапов гарантирует сохранность данных 99.9%. Базы копируются еженедельно с возможностью восстановления на любой момент времени.',
+                lastBackup: 'Последний бэкап',
+                policy: 'Политика копирования',
+                storage: 'Окружение хранения',
+                vault: 'Зашифрованное хранилище',
+                trigger: 'Запустить ручной экспорт',
+                starting: 'Запуск последовательности экспорта...',
+                preparing: 'Подготовка артефактов данных...',
+                encrypting: 'Шифрование хранилища...',
+                uploading: 'Загрузка в слой персистентности...',
+                complete: 'Бэкап завершен! ✨'
+            },
+            compliance: {
+                gdprExport: 'GDPR ЭКСПОРТ',
+                gdprDelete: 'GDPR УДАЛЕНИЕ',
+                rightToBeForgotten: 'Право на забвение'
+            },
+            support: {
+                noRequests: 'Запросов в поддержку пока нет.',
+                sendHello: 'Отправить приветствие'
+            },
+            audit: {
+                locked: 'ЖУРНАЛ АУДИТА: ЗАБЛОКИРОВАН (v3)',
+                checksum: 'Проверка контрольной суммы активна.'
+            },
+            logs: {
+                title: 'Глобальные логи безопасности и операций',
+                searchPlaceholder: 'Поиск по сообщению, актору, действию...',
+                allPriorities: 'Все приоритеты',
+                restoreData: 'ВОССТАНОВИТЬ ДАННЫЕ'
+            }
         },
         safeMode: {
             title: 'Безопасный режим активен',
