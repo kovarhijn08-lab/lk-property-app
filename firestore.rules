@@ -146,6 +146,11 @@ service cloud.firestore {
       allow read, update, delete: if isPMC();
     }
 
+    // Правила для статуса печати (Typing Indicator)
+    match /typing/{typingId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // По умолчанию запрещено всё остальное
     match /{path=**} {
       allow read, write: if false;

@@ -268,6 +268,7 @@ export const AuthProvider = ({ children }) => {
 
     const isPMC = currentUser?.email === 'final_test_8812@example.com' ||
         currentUser?.email === 'admin@example.com' ||
+        currentUser?.email === 'admintest@admin.ru' ||
         currentUser?.role === 'admin' ||
         currentUser?.role === 'pmc';
 

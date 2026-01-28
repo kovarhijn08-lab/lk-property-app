@@ -127,9 +127,13 @@
 - Добавлены search + role filter + export в Users (`app/src/components/AdminDashboard.jsx`, `app/src/translations/index.js`).
 - Обновлён `manual_verification.md` (AU 1, AU 2).
 
-## 2026-01-28 — GPT мозг (Invite Link UX)
+## 2026-01-28 — GPT мозг (Invite Link UX & CI Fix)
+- Исправлен `app/.github/workflows/firestore-deploy.yml`: удален префикс `app/` из путей, исправлен деплой правил Firestore.
+- Добавлен `admintest@admin.ru` в белый список `AuthContext.jsx`.
+- Добавлены правила для коллекции `typing` в `firestore.rules`, чтобы устранить ошибки в логах.
 - Добавлена явная ошибка при создании инвайта + подсказка по правам (`app/src/components/InviteManager.jsx`).
-- Используется `VITE_APP_BASE_URL` при формировании ссылки (fallback на `window.location.origin`).
+- Используется `VITE_APP_BASE_URL` при формировании ссылки.
+- Обновлён `app/manual_verification.md` (INV 1, INV 2).
  - Обновлён `docs/ops_proof.md` с TODO по недостающим доказательствам (Partial).
 
 ---
