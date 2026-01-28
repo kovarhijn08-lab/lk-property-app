@@ -128,9 +128,11 @@
 - Обновлён `manual_verification.md` (AU 1, AU 2).
 
 ## 2026-01-28 — GPT мозг (Invite Link UX & CI Fix)
-- Исправлен `app/.github/workflows/firestore-deploy.yml`: удален префикс `app/` из путей, исправлен деплой правил Firestore.
+- Исправлен `app/.github/workflows/firestore-deploy.yml`: удален префикс `app/` из путей, добавлен `--non-interactive`.
+- Добавлен `app/.firebaserc` с явным указанием проекта `smart-pocket-ledger`.
+- Обновлены `firestore.rules`: добавлен вайтлист по UID (`gXLLyfbt5...`), `isPMC` переведен на тернарные проверки для надежности.
 - Добавлен `admintest@admin.ru` в белый список `AuthContext.jsx`.
-- Добавлены правила для коллекции `typing` в `firestore.rules`, чтобы устранить ошибки в логах.
+- Добавлены правила для коллекции `typing` в `firestore.rules`.
 - Добавлена явная ошибка при создании инвайта + подсказка по правам (`app/src/components/InviteManager.jsx`).
 - Используется `VITE_APP_BASE_URL` при формировании ссылки.
 - Обновлён `app/manual_verification.md` (INV 1, INV 2).

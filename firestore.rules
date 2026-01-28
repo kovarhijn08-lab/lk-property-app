@@ -12,10 +12,11 @@ service cloud.firestore {
       return request.auth.uid == userId;
     }
 
-    // Функция проверки глобального администратора (по email)
+    // Функция проверки глобального администратора (по email и UID)
     function isWhitelistedAdmin() {
       return isAuthenticated() && 
-        request.auth.token.email in ['admin@example.com', 'admintest@admin.ru', 'final_test_8812@example.com'];
+        (request.auth.token.email in ['admin@example.com', 'admintest@admin.ru', 'final_test_8812@example.com'] ||
+         request.auth.uid == 'gXLLyfbt5aMPIcjdJIB6xUoLYht2');
     }
 
     // Внутренняя функция для получения роли (без рекурсии)
@@ -28,11 +29,11 @@ service cloud.firestore {
     }
 
     function isPMC() {
-      return isWhitelistedAdmin() || (isAuthenticated() && getUserRole() == 'pmc');
+      return isWhitelistedAdmin() ? true : (isAuthenticated() && getUserRole() == 'pmc');
     }
 
     function isOwnerRole() {
-      return isWhitelistedAdmin() || (isAuthenticated() && getUserRole() == 'owner');
+      return isWhitelistedAdmin() ? true : (isAuthenticated() && getUserRole() == 'owner');
     }
 
     function isTenantRole() {
