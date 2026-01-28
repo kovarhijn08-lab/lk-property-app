@@ -28,11 +28,11 @@ service cloud.firestore {
     }
 
     function isPMC() {
-      return isAdmin() || (isAuthenticated() && getUserRole() == 'pmc');
+      return isWhitelistedAdmin() || (isAuthenticated() && getUserRole() == 'pmc');
     }
 
     function isOwnerRole() {
-      return isAuthenticated() && getUserRole() == 'owner';
+      return isWhitelistedAdmin() || (isAuthenticated() && getUserRole() == 'owner');
     }
 
     function isTenantRole() {
