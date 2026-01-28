@@ -1,5 +1,5 @@
 import React from 'react';
-import TenantPortal from './TenantPortal';
+import TenantPortal from '../pages/tenant/TenantPortal';
 import { useLanguage } from '../context/LanguageContext';
 
 const TenantArea = ({ properties = [] }) => {

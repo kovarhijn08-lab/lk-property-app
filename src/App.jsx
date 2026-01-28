@@ -55,6 +55,7 @@ import OwnerPortal from './components/OwnerPortal'; // [NEW]
 import TenantArea from './components/TenantArea'; // [NEW]
 import UtilityChargeback from './components/UtilityChargeback'; // [NEW]
 import Onboarding from './components/Onboarding'; // [NEW]
+import LoginHub from './components/LoginHub'; // [NEW]
 import { SearchOverlay } from './components/SearchOverlay'; // [NEW]
 import { useSearch } from './hooks/useSearch'; // [NEW]
 
@@ -64,7 +65,8 @@ function App() {
   const { currentUser, isGhostMode, actualUser, isAdmin, stopImpersonation, isAuthenticated, loading: authLoading, login, signup, logout, sendPasswordReset } = useAuth();
   const isMobile = useMobile();
 
-  const [authView, setAuthView] = useState('login'); // 'login' or 'signup'
+  const [authView, setAuthView] = useState('hub'); // 'hub', 'login', 'signup'
+  const [targetRole, setTargetRole] = useState(null);
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Properties from Firestore (replacing localStorage)
@@ -322,10 +324,45 @@ function App() {
     const urlParams = new URLSearchParams(window.location.search);
     const inviteToken = urlParams.get('invite');
 
-    if (authView === 'signup') {
-      return <SignUp onSignup={signup} onSwitchToLogin={() => setAuthView('login')} inviteToken={inviteToken} />;
+    // Если есть инвайт - сразу на регистрацию жильца
+    if (inviteToken && authView === 'hub') {
+      setAuthView('signup');
     }
-    return <Login onLogin={login} onForgotPassword={sendPasswordReset} onSwitchToSignup={() => setAuthView('signup')} />;
+
+    if (authView === 'hub') {
+      return (
+        <LoginHub
+          onSelectPath={(path) => {
+            if (path === 'business') {
+              setAuthView('login');
+              setTargetRole('owner');
+            } else {
+              setAuthView('login');
+              setTargetRole('tenant');
+            }
+          }}
+        />
+      );
+    }
+
+    if (authView === 'signup') {
+      return (
+        <SignUp
+          onSignup={signup}
+          onSwitchToLogin={() => setAuthView('login')}
+          inviteToken={inviteToken}
+          initialRole={targetRole || 'owner'}
+        />
+      );
+    }
+
+    return (
+      <Login
+        onLogin={login}
+        onForgotPassword={sendPasswordReset}
+        onSwitchToSignup={() => setAuthView('signup')}
+      />
+    );
   }
 
   // [NEW] Onboarding Flow for new users

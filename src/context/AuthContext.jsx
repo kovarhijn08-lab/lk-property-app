@@ -5,11 +5,13 @@ import {
     createUserWithEmailAndPassword,
     signOut,
     updateProfile,
-    sendPasswordResetEmail
+    sendPasswordResetEmail,
+    deleteUser
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { skynet } from '../utils/SkynetLogger';
+import { hashToken } from '../utils/crypto';
 import { firestoreOperations } from '../hooks/useFirestore';
 import { where } from 'firebase/firestore';
 
@@ -122,40 +124,59 @@ export const AuthProvider = ({ children }) => {
             let linkedPropertyId = null;
             let linkedUnitId = null;
 
-            // 1. Invitation Validation for Tenants
+            // 1. Create Firebase User FIRST (to obtain UID for validation)
+            const res = await createUserWithEmailAndPassword(auth, email, password);
+            const uid = res.user.uid;
+
+            let inviteId = null;
+
+            // 2. Invitation Validation for Tenants (Now as Authenticated User)
             if (role === 'tenant') {
-                if (!inviteToken) return { success: false, error: 'Registration for tenants requires an invitation link.' };
+                if (!inviteToken) {
+                    await deleteUser(res.user);
+                    return { success: false, error: 'Registration for tenants requires an invitation link.' };
+                }
 
-                const inviteSnap = await firestoreOperations.getCollection('invitations', [
-                    where('token', '==', inviteToken),
-                    where('status', '==', 'active')
-                ]);
+                const hashedToken = await hashToken(inviteToken);
+                // Use getDocument instead of getCollection for better security (no list required)
+                const inviteSnapshot = await firestoreOperations.getDocument('invitations', hashedToken);
 
-                if (!inviteSnap.success || inviteSnap.data.length === 0) {
+                if (!inviteSnapshot.success) {
+                    await deleteUser(res.user);
                     return { success: false, error: 'Invalid or expired invitation link.' };
                 }
 
-                const inviteData = inviteSnap.data[0];
-                const inviteId = inviteData.id;
+                const inviteData = inviteSnapshot.data;
+                inviteId = inviteData.id;
 
-                // Check expiry
+                // Check status and expiry
+                if (inviteData.status !== 'active') {
+                    await deleteUser(res.user);
+                    return { success: false, error: 'This invitation has already been used or expired.' };
+                }
+
                 if (new Date(inviteData.expiresAt) < new Date()) {
                     await firestoreOperations.updateDocument('invitations', inviteId, { status: 'expired' });
+                    await deleteUser(res.user);
                     return { success: false, error: 'Invitation link has expired.' };
                 }
 
                 linkedPropertyId = inviteData.propertyId;
                 linkedUnitId = inviteData.unitId;
 
-                // Mark as used early or wait for success
-                await firestoreOperations.updateDocument('invitations', inviteId, {
+                // Mark as used AND bind to UID
+                const updateRes = await firestoreOperations.updateDocument('invitations', inviteId, {
                     status: 'used',
-                    usedAt: new Date().toISOString()
+                    usedAt: new Date().toISOString(),
+                    usedBy: uid
                 });
+
+                if (!updateRes.success) {
+                    await deleteUser(res.user);
+                    return { success: false, error: 'Failed to authorize invitation. Please try again.' };
+                }
             }
 
-            // 2. Create Firebase User
-            const res = await createUserWithEmailAndPassword(auth, email, password);
             await updateProfile(res.user, { displayName: name });
 
             // 3. Create User Document
@@ -168,9 +189,28 @@ export const AuthProvider = ({ children }) => {
                 createdAt: new Date().toISOString(),
                 preferences: { currency: 'USD', isDemoMode: false },
                 linkedPropertyId,
-                linkedUnitId
+                linkedUnitId,
+                inviteId // Reference for Firestore rules verification
             };
-            await setDoc(doc(db, 'users', res.user.uid), userData);
+
+            try {
+                await setDoc(doc(db, 'users', res.user.uid), userData);
+            } catch (err) {
+                console.error('[AuthContext] User document creation failed, rolling back...', err);
+
+                // Rollback Invitation if it was marked as used
+                if (role === 'tenant' && inviteId) {
+                    await firestoreOperations.updateDocument('invitations', inviteId, {
+                        status: 'active',
+                        usedAt: null,
+                        usedBy: null
+                    });
+                }
+
+                // Cleanup Auth User
+                await deleteUser(res.user);
+                return { success: false, error: 'Failed to create user profile. Please try again.' };
+            }
 
             // 4. Link Tenant to Property/Unit
             if (role === 'tenant' && linkedPropertyId) {

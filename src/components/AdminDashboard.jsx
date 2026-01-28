@@ -55,6 +55,18 @@ const AdminDashboard = ({ onClose }) => {
     const [backupProgress, setBackupProgress] = useState(0);
     const [isBackingUp, setIsBackingUp] = useState(false);
     const [backupStage, setBackupStage] = useState('');
+    const [userSearch, setUserSearch] = useState('');
+    const [userRoleFilter, setUserRoleFilter] = useState('ALL');
+
+    const downloadJson = (filename, data) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     const isAdmin = (
         actualUser?.email === 'final_test_8812@example.com' ||
@@ -194,6 +206,34 @@ const AdminDashboard = ({ onClose }) => {
         const matchesPriority = priorityFilter === 'ALL' || log.priority === priorityFilter;
 
         return matchesSearch && matchesPriority;
+    });
+
+    const filteredUsers = users.filter(user => {
+        const search = userSearch.trim().toLowerCase();
+        const matchesSearch = !search ||
+            user.name?.toLowerCase().includes(search) ||
+            user.email?.toLowerCase().includes(search) ||
+            user.id?.toLowerCase().includes(search);
+
+        const matchesRole = userRoleFilter === 'ALL' || (user.role || 'user') === userRoleFilter;
+        return matchesSearch && matchesRole;
+    });
+
+    const incidentLogs = persistentLogs.filter(log => {
+        const priority = (log.priority || '').toUpperCase();
+        const type = (log.type || '').toLowerCase();
+        const severity = (log.severity || '').toLowerCase();
+        const isIncident = ['P0', 'P1'].includes(priority) || ['error', 'crash', 'alert'].includes(type) || severity === 'critical';
+        if (!isIncident) return false;
+
+        const matchesSearch =
+            log.msg?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.message?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.actorId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            log.action?.toLowerCase().includes(searchTerm.toLowerCase());
+
+        return matchesSearch;
     });
 
     const handleAutoFix = async (issue) => {
@@ -468,6 +508,7 @@ const AdminDashboard = ({ onClose }) => {
                 <VercelTab id="activity" label={t('admin.tabs.activity')} />
                 <VercelTab id="support" label={t('admin.tabs.support')} />
                 <VercelTab id="backups" label={t('admin.tabs.backups')} />
+                <VercelTab id="incidents" label={t('admin.tabs.incidents')} />
                 <VercelTab id="logs" label={t('admin.tabs.logs')} />
             </nav>
 
@@ -512,6 +553,62 @@ const AdminDashboard = ({ onClose }) => {
                     </div>
                 )}
 
+                {activeTab === 'incidents' && (
+                    <div className="tab-content" style={{ border: '1px solid #333', borderRadius: '12px', background: '#111', overflow: 'hidden' }}>
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{t('admin.incidents.title')}</h2>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                <input
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    placeholder={t('admin.logs.searchPlaceholder')}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', minWidth: '240px' }}
+                                />
+                                <button
+                                    onClick={() => downloadJson('incidents.json', incidentLogs)}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                                >
+                                    {t('admin.incidents.export')}
+                                </button>
+                            </div>
+                        </div>
+                        {incidentLogs.length === 0 ? (
+                            <div style={{ padding: '24px', color: '#666', textAlign: 'center' }}>{t('admin.incidents.empty')}</div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                {incidentLogs.map((log) => (
+                                    <div
+                                        key={log.id}
+                                        className="log-item-hover"
+                                        style={{
+                                            padding: '14px 20px',
+                                            borderBottom: '1px solid #222',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            gap: '16px',
+                                            cursor: 'pointer'
+                                        }}
+                                        onClick={() => setSelectedLog(log)}
+                                    >
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#F43F5E' }}>
+                                                {log.action || log.type || 'incident'}
+                                            </div>
+                                            <div style={{ fontSize: '0.8rem', color: '#aaa' }}>{log.msg || log.message}</div>
+                                            <div style={{ fontSize: '0.7rem', color: '#666' }}>
+                                                Actor: {log.actorId || 'system'} • Priority: {log.priority || 'N/A'}
+                                            </div>
+                                        </div>
+                                        <div style={{ fontSize: '0.7rem', color: '#666' }}>
+                                            {log.timestamp ? new Date(log.timestamp).toLocaleString() : '—'}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
                 {activeTab === 'overview' && (
                     <div className="tab-content">
                         <section className="glass-panel" style={{ padding: '24px', border: '1px solid #333', borderRadius: '12px', background: '#111' }}>
@@ -546,6 +643,13 @@ const AdminDashboard = ({ onClose }) => {
                                 <div>
                                     <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>{t('admin.registeredUsers')}</div>
                                     <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{users.length}</div>
+                                </div>
+
+                                <div>
+                                    <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: '8px' }}>{t('admin.appVersion')}</div>
+                                    <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>
+                                        {import.meta.env?.VITE_APP_VERSION || import.meta.env?.VITE_GIT_SHA || import.meta.env?.VITE_COMMIT_SHA || 'dev'}
+                                    </div>
                                 </div>
                             </div>
                         </section>
@@ -647,6 +751,38 @@ const AdminDashboard = ({ onClose }) => {
 
                 {activeTab === 'users' && (
                     <div className="tab-content" style={{ border: '1px solid #333', borderRadius: '12px', background: '#111', overflow: 'hidden' }}>
+                        <div style={{ padding: '16px 20px', borderBottom: '1px solid #333', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                                <input
+                                    type="text"
+                                    placeholder={t('admin.users.searchPlaceholder')}
+                                    value={userSearch}
+                                    onChange={(e) => setUserSearch(e.target.value)}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', minWidth: '240px' }}
+                                />
+                                <select
+                                    value={userRoleFilter}
+                                    onChange={(e) => setUserRoleFilter(e.target.value)}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem' }}
+                                >
+                                    <option value="ALL">{t('admin.users.roleFilterAll')}</option>
+                                    <option value="admin">admin</option>
+                                    <option value="pmc">pmc</option>
+                                    <option value="owner">owner</option>
+                                    <option value="tenant">tenant</option>
+                                    <option value="user">user</option>
+                                </select>
+                                <span style={{ fontSize: '0.75rem', color: '#777' }}>
+                                    {filteredUsers.length}/{users.length}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => downloadJson('users.json', filteredUsers)}
+                                style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                            >
+                                {t('admin.users.export')}
+                            </button>
+                        </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                             <thead style={{ background: '#222' }}>
                                 <tr>
@@ -660,7 +796,7 @@ const AdminDashboard = ({ onClose }) => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {users.map(user => {
+                                {filteredUsers.map(user => {
                                     const isEditing = editingUser?.id === user.id;
 
                                     return (
@@ -1163,6 +1299,12 @@ const AdminDashboard = ({ onClose }) => {
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#555' }}>{t('admin.audit.checksum')}</div>
                             </div>
+                            <button
+                                onClick={() => downloadJson('logs.json', filteredLogs)}
+                                style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                            >
+                                {t('admin.logs.export')}
+                            </button>
                         </div>
 
                         <div style={{ marginBottom: '20px', display: 'flex', gap: '12px' }}>
@@ -1385,6 +1527,12 @@ const AdminDashboard = ({ onClose }) => {
                                     <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase' }}>Source / Env</div>
                                     <div style={{ fontSize: '0.9rem', color: '#ccc' }}>{selectedLog.source} / {selectedLog.env}</div>
                                 </div>
+                                {selectedLog.metadata?.suppressedCount !== undefined && (
+                                    <div>
+                                        <div style={{ color: '#555', fontSize: '0.7rem', textTransform: 'uppercase' }}>Suppressed</div>
+                                        <div style={{ fontSize: '0.9rem', color: '#ccc' }}>{selectedLog.metadata.suppressedCount}</div>
+                                    </div>
+                                )}
                             </div>
 
                             {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (

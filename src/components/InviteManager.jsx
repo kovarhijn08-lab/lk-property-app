@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { firestoreOperations } from '../hooks/useFirestore';
 import { useAuth } from '../context/AuthContext';
 import { skynet } from '../utils/SkynetLogger';
+import { hashToken } from '../utils/crypto';
 
 const InviteManager = ({ propertyId, unitId, onInviteSent }) => {
     const { currentUser } = useAuth();
@@ -14,39 +15,43 @@ const InviteManager = ({ propertyId, unitId, onInviteSent }) => {
         if (loading) return;
         setLoading(true);
         try {
-            const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-            const inviteId = `invite-${Date.now()}`;
+            const rawToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+            const hashedToken = await hashToken(rawToken);
+            const inviteId = hashedToken; // Use the HASH as the document ID
             const expiresAt = new Date();
             expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
 
             const inviteData = {
                 id: inviteId,
-                token: token,
+                token: hashedToken, // Save the HASH, not the raw token
                 propertyId: propertyId,
                 unitId: unitId || null,
                 targetEmail: email.toLowerCase() || null,
                 status: 'active',
                 expiresAt: expiresAt.toISOString(),
-                createdBy: currentUser.id,
+                createdBy: currentUser?.id || 'unknown',
                 createdAt: new Date().toISOString()
             };
 
-            await firestoreOperations.setDocument('invitations', inviteId, inviteData);
+            const result = await firestoreOperations.setDocument('invitations', inviteId, inviteData);
 
-            // In a real app, this would be a full URL
-            const baseUrl = window.location.origin;
-            const link = `${baseUrl}/signup?invite=${token}`;
-            setInviteLink(link);
+            if (result.success) {
+                const baseUrl = window.location.origin;
+                const link = `${baseUrl}/signup?invite=${rawToken}`;
+                setInviteLink(link);
 
-            skynet.log(`Invite generated for ${email || 'anonymous tenant'}`, 'info', {
-                actorId: currentUser.id,
-                action: 'invite.create',
-                entityType: 'invitation',
-                entityId: inviteId,
-                metadata: { propertyId, unitId }
-            });
+                skynet.log(`Invite generated for ${email || 'anonymous tenant'}`, 'info', {
+                    actorId: currentUser?.id || 'unknown',
+                    action: 'invite.create',
+                    entityType: 'invitation',
+                    entityId: inviteId,
+                    metadata: { propertyId, unitId }
+                });
 
-            if (onInviteSent) onInviteSent(inviteData);
+                if (onInviteSent) onInviteSent(inviteData);
+            } else {
+                alert('Error saving invite to database');
+            }
         } catch (error) {
             console.error('Failed to generate invite:', error);
             alert('Error generating invite');

@@ -11,7 +11,7 @@ import VendorList from './VendorList';
 import BookingForm from './BookingForm';
 import FinancialPlanner from './FinancialPlanner';
 import SideDrawer from './SideDrawer';
-import TenantPortal from './TenantPortal';
+import TenantPortal from '../pages/tenant/TenantPortal';
 import { validateForm } from '../utils/validators';
 import InviteManager from './InviteManager';
 import TagInput from './TagInput'; // [NEW]
@@ -486,6 +486,23 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                                 </div>
                                             </div>
 
+                                            {/* [NEW] Quick Invite Action - only if no units */}
+                                            {!property.units?.length && (
+                                                <div className="glass-panel" style={{ padding: '20px', border: '1px dashed var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>Invite Tenant</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Grant access to this property</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { setActiveTab('tenant'); setShowInviteModal(true); }}
+                                                        className="btn-primary"
+                                                        style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem' }}
+                                                    >
+                                                        + Invite
+                                                    </button>
+                                                </div>
+                                            )}
+
                                             {property.address && (
                                                 <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '12px' }}>
                                                     📍 {property.address}
@@ -715,7 +732,7 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
 
                                                     <TenantPortal
                                                         property={property}
-                                                        transactions={property.transactions || []}
+                                                        embedded
                                                     />
                                                 </>
                                             )}

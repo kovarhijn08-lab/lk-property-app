@@ -9,6 +9,36 @@ import { getSessionId } from './session';
  * Follows P1.1 Audit Standard.
  */
 export const skynet = {
+    _dedupeCache: new Map(),
+    _suppressedCount: 0,
+    _dedupeWindowMs: 5000,
+    _dedupeMax: 2,
+    _shouldLog: (msg, type, meta = {}) => {
+        const action = meta.action || type;
+        const key = `${type}|${action}|${msg}`;
+        const now = Date.now();
+        const entry = skynet._dedupeCache.get(key);
+
+        if (!entry) {
+            skynet._dedupeCache.set(key, { count: 1, lastAt: now });
+            return true;
+        }
+
+        const withinWindow = (now - entry.lastAt) <= skynet._dedupeWindowMs;
+        if (!withinWindow) {
+            skynet._dedupeCache.set(key, { count: 1, lastAt: now });
+            return true;
+        }
+
+        const nextCount = entry.count + 1;
+        skynet._dedupeCache.set(key, { count: nextCount, lastAt: now });
+        const allow = nextCount <= skynet._dedupeMax;
+        if (!allow) {
+            skynet._suppressedCount += 1;
+        }
+        return allow;
+    },
+
     normalizeMeta: (type, meta = {}) => {
         const severityMap = {
             info: 'info',
@@ -61,6 +91,12 @@ export const skynet = {
         const now = new Date();
         const expiresAt = new Date(now.getTime() + retentionDays * 24 * 60 * 60 * 1000);
 
+        const appVersion = meta.appVersion
+            || import.meta?.env?.VITE_APP_VERSION
+            || import.meta?.env?.VITE_GIT_SHA
+            || import.meta?.env?.VITE_COMMIT_SHA
+            || 'dev';
+
         return {
             actorId,
             action,
@@ -72,7 +108,8 @@ export const skynet = {
             expiresAt,
             source: meta.source || 'client',
             env: meta.env || (import.meta.env?.MODE || 'development'),
-            sessionId: getSessionId()
+            sessionId: getSessionId(),
+            appVersion
         };
     },
 
@@ -90,6 +127,10 @@ export const skynet = {
                 : value
         ));
 
+        if (!skynet._shouldLog(msg, type, cleanMeta)) {
+            return;
+        }
+
         const audited = skynet.normalizeMeta(type, cleanMeta);
 
         const logEntry = {
@@ -98,7 +139,10 @@ export const skynet = {
             timestamp: new Date().toISOString(),
             createdAt: serverTimestamp(), // Database authoritative time
             ...audited,
-            metadata: cleanMeta // Move extra meta to structured metadata field
+            metadata: {
+                ...cleanMeta,
+                suppressedCount: skynet._suppressedCount
+            } // Move extra meta to structured metadata field
         };
 
         // Console for local debugging
@@ -156,4 +200,3 @@ export const skynet = {
         }
     }
 };
-

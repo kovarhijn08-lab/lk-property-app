@@ -59,8 +59,8 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid);
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
-      // Арендатор видит объект, если он в нем прописан (через tenantEmails)
-      allow read: if isAuthenticated() && isTenantRole() && request.auth.token.email in resource.data.tenantEmails;
+      // Арендатор видит объект, если он в нем прописан (через UID в tenantIds)
+      allow read: if isAuthenticated() && isTenantRole() && request.auth.uid in resource.data.tenantIds;
 
       // Разрешаем создание
       allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isPMC());
@@ -70,7 +70,18 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAdmin() || isPMC() || isSelf(userId);
       allow create: if isSelf(userId)
-        && request.resource.data.role == 'tenant'
+        && (
+          // Владельцы и PMC создаются свободно
+          request.resource.data.role in ['owner', 'pmc'] || 
+          // Жильцы ОБЯЗАТЕЛЬНО должны предоставить inviteId, привязанный к их UID
+          (
+            request.resource.data.role == 'tenant' &&
+            request.resource.data.inviteId != null &&
+            get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.status == 'used' &&
+            get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.usedBy == userId
+          )
+        )
+        && request.resource.data.role != 'admin'
         && request.resource.data.email == request.auth.token.email;
       allow update: if isAdmin() || isPMC() || (isSelf(userId) && isSafeUserUpdate());
       allow delete: if isAdmin() || isPMC();
@@ -91,10 +102,10 @@ service cloud.firestore {
         resource.data.userId == request.auth.uid ||
         // Либо если это чат по объекту, к которому у пользователя есть доступ
         (isTenantRole() && exists(/databases/$(database)/documents/properties/$(resource.data.propertyId)) &&
-         request.auth.token.email in get(/databases/$(database)/documents/properties/$(resource.data.propertyId)).data.tenantEmails)
+         request.auth.uid in get(/databases/$(database)/documents/properties/$(resource.data.propertyId)).data.tenantIds)
       );
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
     }
 
     // Правила для коллекции заявок на обслуживание
@@ -110,13 +121,23 @@ service cloud.firestore {
 
     // Правила для коллекции приглашений (invitations)
     match /invitations/{inviteId} {
-      // PMC и владельцы могут создавать и управлять
-      allow create, read, update, delete: if isPMC() || isOwnerRole();
+      // PMC и владельцы могут создавать и удалять
+      allow create, delete: if isPMC() || isOwnerRole();
       
-      // Анонимные пользователи могут проверять инвайт и обновлять его (использовать)
-      // Мы ограничиваем обновление только полем status и usedAt для безопасности
-      allow read: if true; 
-      allow update: if (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedAt', 'updatedAt']));
+      // Доступ только по точному ID (хешу токена). Листинг (list) полностью запрещен для всех.
+      allow get: if isAuthenticated(); 
+      
+      // Обновление доступно только при регистрации (использование инвайта) или откате
+      allow update: if isPMC() || isOwnerRole() || (
+        isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'usedAt', 'usedBy', 'updatedAt']) &&
+        (
+          // Сценарий 1: Использование инвайта
+          (request.resource.data.status == 'used' && request.resource.data.usedBy == request.auth.uid) ||
+          // Сценарий 2: Откат инвайта (возврат в active)
+          (request.resource.data.status == 'active' && resource.data.usedBy == request.auth.uid)
+        )
+      );
     }
 
     // Правила для системных логов (Skynet Hub)

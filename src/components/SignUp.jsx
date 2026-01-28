@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 
-const SignUp = ({ onSignup, onSwitchToLogin, inviteToken }) => {
+const SignUp = ({ onSignup, onSwitchToLogin, inviteToken, initialRole = 'owner' }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [role, setRole] = useState(inviteToken ? 'tenant' : 'owner');
+    const [role, setRole] = useState(inviteToken ? 'tenant' : initialRole);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 

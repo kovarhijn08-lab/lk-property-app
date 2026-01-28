@@ -270,6 +270,11 @@ export const translations = {
             title: 'Admin Control Center',
             exit: 'Exit Admin',
             createdAt: 'Created At',
+            users: {
+                searchPlaceholder: 'Search users by name, email, or UID...',
+                roleFilterAll: 'All roles',
+                export: 'Export JSON'
+            },
             tabs: {
                 overview: 'Overview',
                 diagnostics: 'Diagnostics',
@@ -279,6 +284,7 @@ export const translations = {
                 activity: 'Activity Feed',
                 support: 'Support',
                 backups: 'Backups',
+                incidents: 'Incidents',
                 logs: 'Global Logs'
             },
             financials: {
@@ -335,8 +341,15 @@ export const translations = {
                 title: 'Global Security & Operations Logs',
                 searchPlaceholder: 'Search logs by message, actor, action...',
                 allPriorities: 'All Priorities',
-                restoreData: 'RESTORE DATA'
-            }
+                restoreData: 'RESTORE DATA',
+                export: 'Export JSON'
+            },
+            incidents: {
+                title: 'Critical Incidents',
+                empty: 'No critical incidents detected.',
+                export: 'Export JSON'
+            },
+            appVersion: 'App Version'
         },
         safeMode: {
             title: 'System Protection Active',
@@ -685,6 +698,11 @@ export const translations = {
             title: 'Центр управления Admin',
             exit: 'Выйти',
             createdAt: 'Дата регистрации',
+            users: {
+                searchPlaceholder: 'Поиск по имени, email или UID...',
+                roleFilterAll: 'Все роли',
+                export: 'Экспорт JSON'
+            },
             tabs: {
                 overview: 'Обзор',
                 diagnostics: 'Диагностика',
@@ -694,6 +712,7 @@ export const translations = {
                 activity: 'Активность',
                 support: 'Поддержка',
                 backups: 'Бэкапы',
+                incidents: 'Инциденты',
                 logs: 'Глобальные логи'
             },
             financials: {
@@ -750,8 +769,15 @@ export const translations = {
                 title: 'Глобальные логи безопасности и операций',
                 searchPlaceholder: 'Поиск по сообщению, актору, действию...',
                 allPriorities: 'Все приоритеты',
-                restoreData: 'ВОССТАНОВИТЬ ДАННЫЕ'
-            }
+                restoreData: 'ВОССТАНОВИТЬ ДАННЫЕ',
+                export: 'Экспорт JSON'
+            },
+            incidents: {
+                title: 'Критические инциденты',
+                empty: 'Критических инцидентов нет.',
+                export: 'Экспорт JSON'
+            },
+            appVersion: 'Версия приложения'
         },
         safeMode: {
             title: 'Безопасный режим активен',

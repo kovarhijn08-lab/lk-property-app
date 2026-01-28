@@ -66,6 +66,16 @@ const UnitManager = ({ units = [], onUpdate }) => {
                                     <option value="vacant">Vacant</option>
                                     <option value="maintenance">Maintenance</option>
                                 </select>
+                                <button
+                                    onClick={() => {
+                                        // This will need to trigger the invite modal in parent 
+                                        // or showing InviteManager inline
+                                        alert('Use the Invite button in the Tenant tab for this specific unit.');
+                                    }}
+                                    style={{ width: '100%', padding: '8px', background: 'var(--accent-primary)', border: 'none', color: 'white', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer' }}
+                                >
+                                    + Invite to Unit
+                                </button>
                             </div>
                         ) : (
                             <div onClick={() => setEditingUnit(unit.id)} style={{ cursor: 'pointer' }}>

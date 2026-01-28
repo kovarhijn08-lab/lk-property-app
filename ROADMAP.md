@@ -113,6 +113,7 @@
 - [Deployment & Ops](docs/deployment_and_ops.md) — Текущий процесс, риски и целевая схема.
 - [Project Map](docs/project_map.md) — Карта проекта и ключевые модули.
 - [Deployment Handover Checklist](docs/deployment_handover_checklist.md) — Единый файл для передачи деплоя.
+- [SKYNET_TASKS2](app/docs/SKYNET_TASKS2.md) — Продолжение задач для Skynet.
 - [Tenant Portal Spec](docs/tenant_portal_spec.md) — Интерфейс арендатора по мировым практикам.
 
 ---

@@ -5,7 +5,9 @@ This document is the single source of truth for how deployments and operations s
 ## 1) Current Production Deployment (as‑is)
 - **Frontend & API**: Auto‑deploy on `main` via Vercel + Git integration.
 - **Root directory**: `app/`.
-- **Firebase rules**: Manual copy‑paste from `firestore.rules` into Firebase Console.
+- **Firebase rules**:
+  - CI workflow exists (`.github/workflows/firestore-deploy.yml`) but requires secrets.
+  - If secrets are missing, deploy remains manual (copy‑paste into Firebase Console).
 - **CLI**: `vercel` and `firebase` CLI **not installed** in this environment.
 
 ## 2) Known Risks / Gaps
@@ -37,6 +39,29 @@ This document is the single source of truth for how deployments and operations s
 - GitHub Actions: `.github/workflows/firestore-deploy.yml`
 - Triggers on changes to `firestore.rules`, `firestore.indexes.json`, or `firebase.json` in `main`.
 - Uses `FIREBASE_SERVICE_ACCOUNT` and `FIREBASE_PROJECT_ID` secrets.
+
+## 6.1 Ops Proof Checklist (Required)
+This checklist is required to prove CI, rules deployment, and backup infra are реально работают.
+
+### A) CI Workflow Proof (GitHub Actions)
+- [ ] Open GitHub → Actions → **Deploy Firestore Rules** workflow.
+- [ ] Confirm latest run on `main` succeeded.
+- [ ] Save evidence: screenshot + run URL.
+
+### B) Secrets Proof (GitHub)
+- [ ] Open GitHub → Settings → Secrets and variables → Actions.
+- [ ] Confirm **FIREBASE_SERVICE_ACCOUNT** exists.
+- [ ] Confirm **FIREBASE_PROJECT_ID** exists.
+- [ ] Save evidence: screenshot (names only; values hidden).
+
+### C) Firestore Rules Deploy Proof
+- [ ] In Firebase Console → Firestore → Rules → verify last update time matches latest CI run.
+- [ ] Save evidence: screenshot of rules and timestamp.
+
+### D) Backup Infra Proof (GCS + Scheduler)
+- [ ] GCP Console → Cloud Scheduler: verify weekly schedule exists.
+- [ ] GCP Console → Storage: confirm bucket exists and has recent exports.
+- [ ] Save evidence: screenshots of scheduler + bucket with recent export.
 
 ## 7) Backup & Export Policy (P1.4 - Best Practice)
 - **Method**: Firestore Managed Export to **Google Cloud Storage (GCS)**.
