@@ -14,30 +14,35 @@ service cloud.firestore {
 
     // Функция проверки глобального администратора (по email и UID)
     function isWhitelistedAdmin() {
+      let email = request.auth.token.get('email', '');
       return isAuthenticated() && 
-        (request.auth.token.email in ['admin@example.com', 'admintest@admin.ru', 'final_test_8812@example.com'] ||
-         request.auth.uid == 'gXLLyfbt5aMPIcjdJIB6xUoLYht2');
+        (email == 'admin@example.com' || 
+         email == 'admintest@admin.ru' || 
+         email == 'final_test_8812@example.com' ||
+         request.auth.uid == 'gXLLyfbt5aMPIcjdJIB6xUoLYht2' ||
+         request.auth.uid == 'qXLLyfbt5aMPIcjdJIB6xUoLYht2'); // Added variant from logs
     }
 
-    // Внутренняя функция для получения роли (без рекурсии)
-    function getUserRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    // Безопасное получение роли
+    function hasRole(role) {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      return isAuthenticated() && exists(userPath) && get(userPath).data.role == role;
     }
 
     function isAdmin() {
-      return isWhitelistedAdmin() || (isAuthenticated() && getUserRole() == 'admin');
+      return isWhitelistedAdmin() || hasRole('admin');
     }
 
     function isPMC() {
-      return isWhitelistedAdmin() ? true : (isAuthenticated() && getUserRole() == 'pmc');
+      return isWhitelistedAdmin() || hasRole('pmc');
     }
 
     function isOwnerRole() {
-      return isWhitelistedAdmin() ? true : (isAuthenticated() && getUserRole() == 'owner');
+      return isWhitelistedAdmin() || hasRole('owner');
     }
 
     function isTenantRole() {
-      return isAuthenticated() && getUserRole() == 'tenant';
+      return hasRole('tenant');
     }
 
     function isSelf(userId) {
@@ -120,6 +125,11 @@ service cloud.firestore {
       );
     }
 
+    // Правила для индикатора "печатает"
+    match /typing/{typingId} {
+      allow read, write: if isAuthenticated();
+    }
+
     // Правила для коллекции приглашений (invitations)
     match /invitations/{inviteId} {
       // PMC и владельцы могут создавать и удалять
@@ -147,10 +157,6 @@ service cloud.firestore {
       allow read, update, delete: if isPMC();
     }
 
-    // Правила для статуса печати (Typing Indicator)
-    match /typing/{typingId} {
-      allow read, write: if isAuthenticated();
-    }
 
     // По умолчанию запрещено всё остальное
     match /{path=**} {
