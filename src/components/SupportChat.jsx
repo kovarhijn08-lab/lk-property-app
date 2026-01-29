@@ -15,6 +15,21 @@ const SupportChat = ({ onClose, isInline = false, targetUserId = null }) => {
     const { t } = useLanguage();
     const [messageText, setMessageText] = useState('');
     const scrollRef = useRef(null);
+    const isAssistantMode = !isAdmin && !targetUserId;
+
+    const assistantPrompts = [
+        t('assistant.promptAddProperty'),
+        t('assistant.promptInviteTenant'),
+        t('assistant.promptAddDocs'),
+        t('assistant.promptCreateBooking')
+    ].filter(Boolean);
+
+    const assistantSteps = [
+        { title: t('assistant.stepProperty'), desc: t('assistant.stepPropertyDesc') },
+        { title: t('assistant.stepDocs'), desc: t('assistant.stepDocsDesc') },
+        { title: t('assistant.stepBooking'), desc: t('assistant.stepBookingDesc') },
+        { title: t('assistant.stepInvite'), desc: t('assistant.stepInviteDesc') }
+    ].filter(step => step.title && step.desc);
 
     // Техподдержка использует 'support' как propertyId. 
     // В поле unitId мы храним UID пользователя, которому нужна помощь (для группировки).
@@ -107,9 +122,9 @@ const SupportChat = ({ onClose, isInline = false, targetUserId = null }) => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <div style={{ width: '30px', height: '30px', background: 'rgba(255,255,255,0.2)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🤖</div>
                     <div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>Support Center</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 800 }}>{isAssistantMode ? (t('assistant.title') || 'Araya Assistant') : 'Support Center'}</div>
                         <div style={{ fontSize: '0.65rem', opacity: 0.8 }}>
-                            {isAdmin ? `Chat with ${targetUserId?.substring(0, 8) || 'User'}` : 'We usually reply instantly'}
+                            {isAdmin ? `Chat with ${targetUserId?.substring(0, 8) || 'User'}` : (isAssistantMode ? (t('assistant.subTitle') || 'Guided onboarding and support') : 'We usually reply instantly')}
                         </div>
                     </div>
                 </div>
@@ -147,7 +162,9 @@ const SupportChat = ({ onClose, isInline = false, targetUserId = null }) => {
                 ) : messages.length === 0 ? (
                     <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '20px' }}>
                         <div style={{ fontSize: '2rem', marginBottom: '10px' }}>✉️</div>
-                        <div style={{ fontSize: '0.8rem' }}>Have a problem or a feature request? Drop us a line!</div>
+                        <div style={{ fontSize: '0.8rem' }}>
+                            {isAssistantMode ? (t('assistant.emptyState') || 'Ask anything about setup or daily operations.') : 'Have a problem or a feature request? Drop us a line!'}
+                        </div>
                     </div>
                 ) : (
                     messages.map((msg, i) => {
@@ -211,6 +228,21 @@ const SupportChat = ({ onClose, isInline = false, targetUserId = null }) => {
                         );
                     })
                 )}
+                {isAssistantMode && messages.length === 0 && (
+                    <div className="glass-panel" style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: 'var(--accent-primary)' }}>
+                            {t('assistant.guideTitle')}
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
+                            {assistantSteps.map(step => (
+                                <div key={step.title} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{step.title}</div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{step.desc}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
                 {otherMemberTyping && (
                     <div style={{ alignSelf: 'flex-start', padding: '4px 8px', background: 'rgba(255,255,255,0.05)', borderRadius: '10px', fontSize: '0.7rem', color: 'var(--accent-primary)', fontStyle: 'italic' }}>
                         typing...
@@ -219,7 +251,31 @@ const SupportChat = ({ onClose, isInline = false, targetUserId = null }) => {
             </div>
 
             {/* Footer Input */}
-            <form onSubmit={handleSend} style={{ padding: '16px', borderTop: '1px solid var(--glass-border)', display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <form onSubmit={handleSend} style={{ padding: '16px', borderTop: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {isAssistantMode && (
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {assistantPrompts.map(prompt => (
+                            <button
+                                key={prompt}
+                                type="button"
+                                onClick={() => setMessageText(prompt)}
+                                style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '999px',
+                                    border: '1px solid rgba(99, 102, 241, 0.3)',
+                                    background: 'rgba(99, 102, 241, 0.12)',
+                                    color: 'white',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {prompt}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
                     <input
                         type="file"
@@ -267,6 +323,7 @@ const SupportChat = ({ onClose, isInline = false, targetUserId = null }) => {
                 >
                     <SendIcon size={18} color="white" />
                 </button>
+                </div>
             </form>
         </div>
     );

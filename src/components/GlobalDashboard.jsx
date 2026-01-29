@@ -12,7 +12,7 @@ import { TrendUpIcon, TrendDownIcon, HomeIcon, BuildingIcon, OfficeIcon, HotelIc
 import FilterBar from './FilterBar'; // [NEW]
 import { getUniqueTags, getTagColor, matchTags } from '../utils/tagUtils'; // [NEW]
 
-const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateProperty, onAddProperty, onOpenDrawer, user }) => {
+const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateProperty, onAddProperty, onOpenDrawer, onOpenAssistant, onOpenCalendar, onOpenLegalHub, onOpenPropertyTab, onOpenBookingFlow, onOpenChats, user }) => {
     const { t } = useLanguage();
     const [showGoalModal, setShowGoalModal] = useState(false);
     const [editingPropertyId, setEditingPropertyId] = useState(null);
@@ -75,6 +75,58 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
     const occupiedUnits = activeProperties.reduce((acc, p) => acc + (p.occupancy?.occupied || 0), 0);
     const occupancyRate = totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0;
 
+    const contractCount = activeProperties.reduce((acc, p) => acc + ((p.contracts || []).length), 0);
+    const hasProperty = activeProperties.length > 0;
+    const hasDocs = contractCount >= 2;
+    const hasBookings = activeProperties.some(p => (p.bookings || []).length > 0);
+    const assistantStepsDone = [hasProperty, hasDocs, hasBookings].filter(Boolean).length;
+    const assistantProgress = Math.round((assistantStepsDone / 3) * 100);
+    const assistantState = (() => {
+        if (!hasProperty) {
+            return {
+                title: t('dashboard.assistantStepProperty'),
+                description: t('dashboard.assistantDescProperty'),
+                cta: t('dashboard.assistantCtaAddProperty'),
+                onAction: () => onAddProperty()
+            };
+        }
+        if (!hasDocs) {
+            return {
+                title: t('dashboard.assistantStepDocs'),
+                description: t('dashboard.assistantDescDocs'),
+                cta: t('dashboard.assistantCtaOpenProperty'),
+                onAction: () => onPropertyClick(activeProperties[0]?.id)
+            };
+        }
+        if (!hasBookings) {
+            return {
+                title: t('dashboard.assistantStepBooking'),
+                description: t('dashboard.assistantDescBooking'),
+                cta: t('dashboard.assistantCtaOpenProperty'),
+                onAction: () => onPropertyClick(activeProperties[0]?.id)
+            };
+        }
+        return {
+            title: t('dashboard.assistantStepReady'),
+            description: t('dashboard.assistantDescReady'),
+            cta: t('dashboard.assistantCtaViewPortfolio'),
+            onAction: () => onPropertyClick(activeProperties[0]?.id)
+        };
+    })();
+    const showQuickStart = (user?.role === 'owner' || user?.role === 'pmc') && (!hasProperty || !hasDocs);
+
+    const uniqueCurrencies = Array.from(new Set(activeProperties.map(p => p.currency || 'USD')));
+    const hasMultiCurrency = uniqueCurrencies.length > 1;
+
+    const formatCurrency = (value, currency = 'USD') => {
+        const amount = Number(value || 0);
+        try {
+            return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+        } catch (e) {
+            return `${currency} ${amount.toLocaleString()}`;
+        }
+    };
+
     // Mock trend calculations (in real app, compare with previous period from Firestore)
     const cashFlowTrend = Math.random() * 20 - 5; // -5% to +15%
     const equityTrend = Math.random() * 15 + 2; // +2% to +17%
@@ -135,7 +187,7 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
                 marginBottom: '10px'
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{ fontWeight: 900, fontSize: '1.1rem', fontFamily: 'var(--font-display)', color: 'white' }}>POCKET LEDGER</div>
+                    <div style={{ fontWeight: 900, fontSize: '1.1rem', fontFamily: 'var(--font-display)', color: 'white' }}>ARAYA HOME</div>
                 </div>
                 <button
                     onClick={onOpenDrawer}
@@ -179,6 +231,105 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
                 propertyName="Весь Портфель"
             />
 
+            {/* Quick Start */}
+            {showQuickStart && (
+                <section className="glass-panel" style={{ padding: '20px', border: '1px solid rgba(99, 102, 241, 0.35)', background: 'rgba(99, 102, 241, 0.08)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                        <div>
+                            <div style={{ fontSize: '0.7rem', letterSpacing: '1.5px', textTransform: 'uppercase', color: '#A5B4FC', fontWeight: 800 }}>{t('dashboard.quickStartTitle')}</div>
+                            <div style={{ fontSize: '1.1rem', fontWeight: 900, marginTop: '6px' }}>{t('dashboard.quickStartHeadline')}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{t('dashboard.quickStartSub')}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            {!hasProperty && (
+                                <button onClick={() => onAddProperty()} className="btn-primary" style={{ padding: '10px 16px', borderRadius: '10px' }}>
+                                    + {t('dashboard.quickStartAddProperty')}
+                                </button>
+                            )}
+                            {hasProperty && !hasDocs && (
+                                <button onClick={() => onPropertyClick(activeProperties[0]?.id)} className="btn-secondary" style={{ padding: '10px 16px', borderRadius: '10px' }}>
+                                    {t('dashboard.quickStartOpenProperty')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginTop: '16px' }}>
+                        <div style={{ padding: '12px', borderRadius: '12px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: hasProperty ? 'var(--accent-success)' : 'white' }}>
+                                {hasProperty ? '✅' : '⬜'} {t('dashboard.quickStartProperty')}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{t('dashboard.quickStartPropertyDesc')}</div>
+                        </div>
+                        <div style={{ padding: '12px', borderRadius: '12px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: hasDocs ? 'var(--accent-success)' : 'white' }}>
+                                {hasDocs ? '✅' : '⬜'} {t('dashboard.quickStartDocs')}
+                            </div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{t('dashboard.quickStartDocsDesc')}</div>
+                        </div>
+                    </div>
+                </section>
+            )}
+
+            {/* Assistant */}
+            <section className="glass-panel" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div>
+                        <div style={{ fontSize: '0.7rem', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--accent-primary)', fontWeight: 800 }}>{t('dashboard.assistantTitle')}</div>
+                        <div style={{ fontSize: '1.1rem', fontWeight: 900, marginTop: '6px' }}>{assistantState.title}</div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>{assistantState.description}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button onClick={assistantState.onAction} className="btn-primary" style={{ padding: '10px 16px', borderRadius: '10px' }}>
+                            {assistantState.cta}
+                        </button>
+                        {onOpenAssistant && (
+                            <button onClick={onOpenAssistant} className="btn-secondary" style={{ padding: '10px 16px', borderRadius: '10px' }}>
+                                {t('assistant.openChat')}
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                        <span>{t('dashboard.assistantProgress')}</span>
+                        <span>{assistantProgress}%</span>
+                    </div>
+                    <div style={{ marginTop: '6px', height: '8px', borderRadius: '999px', background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${assistantProgress}%`, background: 'var(--gradient-primary)' }} />
+                    </div>
+                </div>
+            </section>
+
+            {/* PMC Quick Actions */}
+            {user?.role === 'pmc' && (
+                <section className="glass-panel" style={{ padding: '20px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                        <div>
+                            <div style={{ fontSize: '0.7rem', letterSpacing: '1.5px', textTransform: 'uppercase', color: 'var(--accent-primary)', fontWeight: 800 }}>
+                                {t('dashboard.pmcQuickTitle')}
+                            </div>
+                            <div style={{ fontSize: '1rem', fontWeight: 800, marginTop: '6px' }}>{t('dashboard.pmcQuickSub')}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                            <button onClick={() => onOpenCalendar && onOpenCalendar()} className="btn-secondary" style={{ padding: '10px 14px', borderRadius: '10px' }}>
+                                {t('dashboard.pmcQuickCalendar')}
+                            </button>
+                            <button onClick={() => (onOpenBookingFlow ? onOpenBookingFlow() : onOpenPropertyTab && onOpenPropertyTab('tenant'))} className="btn-primary" style={{ padding: '10px 14px', borderRadius: '10px' }}>
+                                {t('dashboard.pmcQuickBooking')}
+                            </button>
+                            <button onClick={() => onOpenLegalHub && onOpenLegalHub()} className="btn-secondary" style={{ padding: '10px 14px', borderRadius: '10px' }}>
+                                {t('dashboard.pmcQuickDocs')}
+                            </button>
+                            {onOpenChats && (
+                                <button onClick={() => onOpenChats()} className="btn-secondary" style={{ padding: '10px 14px', borderRadius: '10px' }}>
+                                    {t('dashboard.pmcQuickChats')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </section>
+            )}
+
             {/* Header / Portfolio Summary */}
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '16px' }}>
                 <div className="glass-panel" style={{ padding: '24px', position: 'relative', background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(15, 23, 42, 0.4) 100%)' }}>
@@ -190,10 +341,20 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
                             <div style={{ fontSize: '2.4rem', fontWeight: 900, fontFamily: 'var(--font-display)', lineHeight: 1, letterSpacing: '-1px', color: 'white' }}>
                                 ${totalValue.toLocaleString()}
                             </div>
+                            {hasMultiCurrency && (
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                                    {t('dashboard.multiCurrencyNote')}
+                                </div>
+                            )}
                             <div style={{ marginTop: '12px', display: 'flex', gap: '12px', alignItems: 'center' }}>
                                 <div style={{ fontSize: '0.8rem', color: 'var(--accent-success)', fontWeight: 800 }}>
                                     {totalLifetimeProfit > 0 ? `+${totalLifetimeProfit.toLocaleString()} realizing` : ''}
                                 </div>
+                                {hasMultiCurrency && (
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase' }}>
+                                        {t('dashboard.multiCurrencyBadge')}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <BuildingIcon size={40} color="var(--accent-success)" strokeWidth={2} style={{ opacity: 0.2 }} />
@@ -453,10 +614,10 @@ const GlobalDashboard = ({ properties, onPropertyClick, onViewReports, onUpdateP
                                 </div>
                             </div>
                             <div style={{ textAlign: 'right' }}>
-                                <div style={{ fontWeight: 900, fontSize: '1rem', color: 'white', marginBottom: '4px' }}>${p.marketValue?.toLocaleString()}</div>
+                                <div style={{ fontWeight: 900, fontSize: '1rem', color: 'white', marginBottom: '4px' }}>{formatCurrency(p.marketValue, p.currency)}</div>
                                 {p.monthlyIncome && (
                                     <div style={{ fontSize: '0.7rem', color: 'var(--accent-success)', fontWeight: 700 }}>
-                                        ${p.monthlyIncome.toLocaleString()}/мес
+                                        {formatCurrency(p.monthlyIncome, p.currency)}/мес
                                     </div>
                                 )}
                                 <div style={{ fontSize: '0.6rem', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 700, marginTop: '2px' }}>{p.type}</div>

@@ -17,6 +17,8 @@ const TenantDashboard = ({ property, onNavigate }) => {
 
     const hasUnread = messages.some(m => !m.read && m.userId !== currentUser?.id);
     const openRequests = requests.filter(r => r.status !== 'Completed');
+    const nextActionTarget = hasUnread ? 'messages' : openRequests.length > 0 ? 'maintenance' : null;
+    const nextActionLabel = hasUnread ? 'Open Messages' : openRequests.length > 0 ? 'View Request' : null;
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -57,6 +59,25 @@ const TenantDashboard = ({ property, onNavigate }) => {
                         </p>
                     </div>
                 </div>
+                {nextActionTarget && (
+                    <button
+                        onClick={() => onNavigate && onNavigate(nextActionTarget)}
+                        style={{
+                            marginTop: '16px',
+                            width: '100%',
+                            padding: '10px',
+                            borderRadius: '10px',
+                            border: '1px solid var(--glass-border)',
+                            background: 'rgba(255,255,255,0.05)',
+                            color: 'white',
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {nextActionLabel}
+                    </button>
+                )}
             </div>
 
             {/* Quick Actions Grid */}

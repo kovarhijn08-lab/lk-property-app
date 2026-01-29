@@ -7,6 +7,10 @@
 - Run status: ☐ success ☐ failed
 - Screenshot attached: ☐
  - TODO: Add GitHub Actions run URL + screenshot
+ - How to verify:
+   1) GitHub → Actions → “Deploy Firestore Rules”.
+   2) Open latest run → copy URL.
+   3) Сделайте скриншот страницы run с зелёной галочкой.
 
 ## B) Secrets Proof (GitHub)
 - Location: Settings → Secrets and variables → Actions
@@ -19,6 +23,10 @@
 - Last updated timestamp: 
 - Screenshot attached: ☐
  - TODO: Add rules timestamp + screenshot
+ - How to verify:
+   1) Firebase Console → Firestore → Rules.
+   2) Посмотрите “Last updated”.
+   3) Сделайте скриншот с датой.
 
 ## D) Backup Infra Proof (GCS + Scheduler)
 - Cloud Scheduler job name: `firestore-weekly-backup`
@@ -26,11 +34,19 @@
 - Last run status: ☐ success ☐ failed (Needs verification after IAM update)
 - Screenshot attached: ☐
  - TODO: Add scheduler status screenshot
+ - How to verify:
+   1) GCP → Cloud Scheduler → job `firestore-weekly-backup`.
+   2) Откройте job → статус последнего запуска.
+   3) Сделайте скриншот со статусом.
 
 - GCS bucket name: `lk-property-backups-2026` (asia-southeast1)
 - Latest export folder/date: 
 - Screenshot attached: ☐
  - TODO: Add bucket export screenshot + latest folder/date
+ - How to verify:
+   1) GCP → Cloud Storage → bucket `lk-property-backups-2026`.
+   2) Откройте последнюю папку экспорта (дата).
+   3) Сделайте скриншот списка объектов.
 
 ## Notes
 - CI Workflow moved from `app/.github` to project root for standard GitHub Actions detection.

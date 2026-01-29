@@ -9,6 +9,7 @@ export const translations = {
             loading: 'Loading...',
             search: 'Search...',
             settings: 'Settings',
+            chats: 'Chats',
             logout: 'Sign Out',
             profile: 'Profile',
             allProperties: 'Global Dashboard',
@@ -19,7 +20,8 @@ export const translations = {
             exportPdf: 'Export PDF',
             taxDocs: 'Tax Documents',
             saveGoal: 'Goal Saved',
-            tags: 'Tags'
+            tags: 'Tags',
+            optional: 'Optional'
         },
         filters: {
             title: 'Filters',
@@ -52,7 +54,37 @@ export const translations = {
             commercial: 'Commercial',
             cashFlowInfo: 'Combined net cash flow from all active properties.',
             equityInfo: 'Active Market Value minus Purchase Price.',
-            noiInfo: 'Gross Income minus OpEx (excludes CapEx/Mortgage).'
+            noiInfo: 'Gross Income minus OpEx (excludes CapEx/Mortgage).',
+            quickStartTitle: 'Quick Start',
+            quickStartHeadline: 'Complete your first success',
+            quickStartSub: 'Create 1 property and add 2 documents.',
+            quickStartProperty: 'Create your first property',
+            quickStartPropertyDesc: 'Required for portfolio setup',
+            quickStartDocs: 'Add 2 documents',
+            quickStartDocsDesc: 'Contracts, acts, invoices',
+            quickStartAddProperty: 'Add property',
+            quickStartOpenProperty: 'Open property',
+            multiCurrencyNote: 'Totals shown without FX conversion.',
+            multiCurrencyBadge: 'Multi‑currency portfolio',
+            assistantTitle: 'Araya Assistant',
+            assistantProgress: 'Progress to First Value',
+            assistantStepProperty: 'Create your first property',
+            assistantDescProperty: 'Add a property to unlock your dashboard and portfolio.',
+            assistantStepDocs: 'Add 2 key documents',
+            assistantDescDocs: 'Upload contracts, acts, invoices, or receipts.',
+            assistantStepBooking: 'Add your first booking',
+            assistantDescBooking: 'Activate your calendar with a real booking.',
+            assistantStepReady: 'Portfolio ready',
+            assistantDescReady: 'Review performance or invite your tenants.',
+            assistantCtaAddProperty: 'Add property',
+            assistantCtaOpenProperty: 'Open property',
+            assistantCtaViewPortfolio: 'View portfolio',
+            pmcQuickTitle: 'PMC Quick Actions',
+            pmcQuickSub: 'Fast access to daily operations',
+            pmcQuickCalendar: 'Open calendar',
+            pmcQuickBooking: 'Add booking',
+            pmcQuickDocs: 'Legal Hub',
+            pmcQuickChats: 'Open chats'
         },
         goalTracker: {
             title: 'Cash Flow Goal',
@@ -92,11 +124,35 @@ export const translations = {
             tip: 'Specify the desired monthly cash flow for',
             portfolio: 'portfolio'
         },
+        portfolio: {
+            emptyTitle: 'Your Portfolio is Empty',
+            emptyDesc: 'Start by adding your first property or load our standard demo dataset to explore the features.',
+            loadDemo: 'Load Demo Data'
+        },
         charts: {
             projection: 'PROJECTION',
             expenseSpike: 'Expense Spike',
             highIncome: 'High Income',
             projectedFlow: 'Projected Flow'
+        },
+        assistant: {
+            title: 'Araya Assistant',
+            subTitle: 'Guided onboarding and support',
+            emptyState: 'Ask anything about setup or daily operations.',
+            guideTitle: 'Quick guide',
+            promptAddProperty: 'How do I add my first property?',
+            promptInviteTenant: 'How do I invite a tenant?',
+            promptAddDocs: 'How do I add documents?',
+            promptCreateBooking: 'How do I create a booking?',
+            openChat: 'Ask Assistant',
+            stepProperty: '1) Add a property',
+            stepPropertyDesc: 'Create your first property to unlock the dashboard.',
+            stepDocs: '2) Upload key documents',
+            stepDocsDesc: 'Add contracts, acts, invoices or receipts.',
+            stepBooking: '3) Create a booking',
+            stepBookingDesc: 'Activate your calendar with the first booking.',
+            stepInvite: '4) Invite a tenant',
+            stepInviteDesc: 'Generate an invite link and share it.'
         },
         months: {
             jan: 'Jan', feb: 'Feb', mar: 'Mar', apr: 'Apr', may: 'May', jun: 'Jun',
@@ -122,6 +178,10 @@ export const translations = {
             type: 'Property Type',
             units: 'Units',
             purchasePrice: 'Purchase Price',
+            currency: 'Currency',
+            showAdvanced: 'Show advanced',
+            hideAdvanced: 'Hide advanced',
+            quickStartHint: 'After creating a property, add 2 documents to complete your Quick Start.',
             income: 'Monthly Income',
             expenses: 'Monthly Expenses',
             commercialConfig: 'Commercial Configuration',
@@ -269,6 +329,10 @@ export const translations = {
         admin: {
             title: 'Admin Control Center',
             exit: 'Exit Admin',
+            systemStatus: 'System Status',
+            dbConnection: 'DB Connection',
+            latency: 'Latency',
+            registeredUsers: 'Registered Users',
             createdAt: 'Created At',
             users: {
                 searchPlaceholder: 'Search users by name, email, or UID...',
@@ -342,7 +406,9 @@ export const translations = {
                 searchPlaceholder: 'Search logs by message, actor, action...',
                 allPriorities: 'All Priorities',
                 restoreData: 'RESTORE DATA',
-                export: 'Export JSON'
+                export: 'Export JSON',
+                copy: 'Copy JSON',
+                copied: 'Copied'
             },
             incidents: {
                 title: 'Critical Incidents',
@@ -394,6 +460,8 @@ export const translations = {
             vendor: 'Assign Vendor',
             noVendor: 'No Vendor',
             save: 'Save',
+            expenses: 'Expenses',
+            noTransactions: 'No transactions yet',
             rentIncome: 'Rental Revenue',
             repairCost: 'Repair Cost',
             mortgage: 'Mortgage',
@@ -448,6 +516,7 @@ export const translations = {
             loading: 'Загрузка...',
             search: 'Поиск...',
             settings: 'Настройки',
+            chats: 'Чаты',
             logout: 'Выйти',
             profile: 'Профиль',
             allProperties: 'Общий Дашборд',
@@ -458,7 +527,8 @@ export const translations = {
             exportPdf: 'Экспорт PDF',
             taxDocs: 'Налоговые Документы',
             saveGoal: 'Цель сохранена',
-            tags: 'Метки'
+            tags: 'Метки',
+            optional: 'Необязательно'
         },
         filters: {
             title: 'Фильтры',
@@ -491,7 +561,42 @@ export const translations = {
             commercial: 'Коммерческая',
             cashFlowInfo: 'Суммарный чистый денежный поток от всех активных объектов.',
             equityInfo: 'Текущая рыночная стоимость минус цена покупки.',
-            noiInfo: 'Валовый доход минус OpEx (без учета CapEx/Ипотеки).'
+            noiInfo: 'Валовый доход минус OpEx (без учета CapEx/Ипотеки).',
+            quickStartTitle: 'Быстрый старт',
+            quickStartHeadline: 'Достигните первого успеха',
+            quickStartSub: 'Создайте 1 объект и добавьте 2 документа.',
+            quickStartProperty: 'Создайте первый объект',
+            quickStartPropertyDesc: 'Нужно для настройки портфеля',
+            quickStartDocs: 'Добавьте 2 документа',
+            quickStartDocsDesc: 'Договоры, акты, счета',
+            quickStartAddProperty: 'Добавить объект',
+            quickStartOpenProperty: 'Открыть объект',
+            multiCurrencyNote: 'Итоги без конвертации валют.',
+            multiCurrencyBadge: 'Мультивалютный портфель',
+            assistantTitle: 'Araya Assistant',
+            assistantProgress: 'Прогресс до первой ценности',
+            assistantStepProperty: 'Создать первый объект',
+            assistantDescProperty: 'Добавьте объект, чтобы активировать панель и портфель.',
+            assistantStepDocs: 'Добавить 2 ключевых документа',
+            assistantDescDocs: 'Загрузите договоры, акты, счета или чеки.',
+            assistantStepBooking: 'Создать первое бронирование',
+            assistantDescBooking: 'Активируйте календарь реальным бронированием.',
+            assistantStepReady: 'Портфель готов',
+            assistantDescReady: 'Проверьте показатели или пригласите жильцов.',
+            assistantCtaAddProperty: 'Добавить объект',
+            assistantCtaOpenProperty: 'Открыть объект',
+            assistantCtaViewPortfolio: 'Открыть портфель',
+            pmcQuickTitle: 'PMC быстрые действия',
+            pmcQuickSub: 'Быстрый доступ к операциям',
+            pmcQuickCalendar: 'Открыть календарь',
+            pmcQuickBooking: 'Добавить бронь',
+            pmcQuickDocs: 'Юридический хаб',
+            pmcQuickChats: 'Открыть чаты'
+        },
+        portfolio: {
+            emptyTitle: 'Портфель пуст',
+            emptyDesc: 'Начните с добавления первого объекта или загрузите демо‑данные, чтобы изучить продукт.',
+            loadDemo: 'Загрузить демо‑данные'
         },
         goalTracker: {
             title: 'Цель по Денежному Потоку',
@@ -537,6 +642,25 @@ export const translations = {
             highIncome: 'Высокий доход',
             projectedFlow: 'Прогноз потока'
         },
+        assistant: {
+            title: 'Araya Assistant',
+            subTitle: 'Помощь в настройке и работе',
+            emptyState: 'Задайте любой вопрос по настройке или ежедневной работе.',
+            guideTitle: 'Быстрый гид',
+            promptAddProperty: 'Как добавить первый объект?',
+            promptInviteTenant: 'Как пригласить жильца?',
+            promptAddDocs: 'Как добавить документы?',
+            promptCreateBooking: 'Как создать бронирование?',
+            openChat: 'Спросить ассистента',
+            stepProperty: '1) Добавьте объект',
+            stepPropertyDesc: 'Создайте первый объект, чтобы открыть дашборд.',
+            stepDocs: '2) Загрузите ключевые документы',
+            stepDocsDesc: 'Добавьте договоры, акты, счета или чеки.',
+            stepBooking: '3) Создайте бронирование',
+            stepBookingDesc: 'Активируйте календарь первым бронированием.',
+            stepInvite: '4) Пригласите жильца',
+            stepInviteDesc: 'Сгенерируйте инвайт‑ссылку и отправьте её.'
+        },
         months: {
             jan: 'Янв', feb: 'Фев', mar: 'Мар', apr: 'Апр', may: 'Май', jun: 'Июн',
             jul: 'Июл', aug: 'Авг', sep: 'Сен', oct: 'Окт', nov: 'Ноя', dec: 'Дек'
@@ -561,6 +685,10 @@ export const translations = {
             type: 'Тип Недвижимости',
             units: 'Юниты',
             purchasePrice: 'Цена Покупки',
+            currency: 'Валюта',
+            showAdvanced: 'Показать расширенные',
+            hideAdvanced: 'Скрыть расширенные',
+            quickStartHint: 'После создания объекта добавьте 2 документа, чтобы завершить быстрый старт.',
             income: 'Ежемесячный Доход',
             expenses: 'Ежемесячные Расходы',
             commercialConfig: 'Коммерческие Настройки',
@@ -697,6 +825,10 @@ export const translations = {
         admin: {
             title: 'Центр управления Admin',
             exit: 'Выйти',
+            systemStatus: 'Состояние системы',
+            dbConnection: 'Соединение с БД',
+            latency: 'Задержка',
+            registeredUsers: 'Зарегистрированные пользователи',
             createdAt: 'Дата регистрации',
             users: {
                 searchPlaceholder: 'Поиск по имени, email или UID...',
@@ -770,7 +902,9 @@ export const translations = {
                 searchPlaceholder: 'Поиск по сообщению, актору, действию...',
                 allPriorities: 'Все приоритеты',
                 restoreData: 'ВОССТАНОВИТЬ ДАННЫЕ',
-                export: 'Экспорт JSON'
+                export: 'Экспорт JSON',
+                copy: 'Скопировать JSON',
+                copied: 'Скопировано'
             },
             incidents: {
                 title: 'Критические инциденты',
@@ -822,6 +956,8 @@ export const translations = {
             vendor: 'Назначить Вендора',
             noVendor: 'Без Вендора',
             save: 'Сохранить',
+            expenses: 'Расходы',
+            noTransactions: 'Нет транзакций',
             rentIncome: 'Доход от Аренды',
             repairCost: 'Затраты на Ремонт',
             mortgage: 'Ипотека',

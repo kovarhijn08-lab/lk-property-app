@@ -8,7 +8,7 @@ const Onboarding = ({ onComplete }) => {
     const { currentUser, updatePreferences, logout } = useAuth();
     const { t } = useLanguage();
     const [step, setStep] = useState(1);
-    const [role, setRole] = useState(null); // 'pmc', 'owner', 'tenant'
+    const [role, setRole] = useState(currentUser?.role || null); // 'pmc', 'owner', 'tenant'
     const [loading, setLoading] = useState(false);
 
     // Step 2 Form States
@@ -17,6 +17,8 @@ const Onboarding = ({ onComplete }) => {
     const [ownerEmail, setOwnerEmail] = useState(''); // [NEW] For PMC linking
     const [tenantCode, setTenantCode] = useState('');
     const [propertyId, setPropertyId] = useState(null);
+    const [propertyCurrency, setPropertyCurrency] = useState('USD');
+    const currencyOptions = ['USD', 'THB', 'AED', 'IDR', 'RUB'];
 
     // Step 1 Profile States
     const [userName, setUserName] = useState(currentUser?.name || '');
@@ -27,12 +29,14 @@ const Onboarding = ({ onComplete }) => {
     const [transactionAmount, setTransactionAmount] = useState(''); // For PMC
     const [managementType, setManagementType] = useState('self'); // For Owner: 'self' or 'pmc'
     const [maintenanceDesc, setMaintenanceDesc] = useState(''); // For Tenant
+    const isRoleLocked = !!currentUser?.role;
 
     const { setLanguage } = useLanguage();
 
     const handleRoleSelect = async (selectedRole) => {
         setLoading(true);
         try {
+            const finalRole = currentUser?.role || selectedRole;
             // Save initial profile data
             await firestoreOperations.updateDocument('users', currentUser.id, {
                 name: userName,
@@ -41,7 +45,7 @@ const Onboarding = ({ onComplete }) => {
             });
             if (userLang) setLanguage(userLang);
 
-            setRole(selectedRole);
+            setRole(finalRole);
             setStep(2);
         } catch (e) {
             console.error('Step 1 save error:', e);
@@ -80,6 +84,7 @@ const Onboarding = ({ onComplete }) => {
                     type: 'rental',
                     purchasePrice: parseFloat(propertyPrice) || 0,
                     marketValue: parseFloat(propertyPrice) || 0,
+                    currency: propertyCurrency || 'USD',
                     units: [{ id: `unit-${Date.now()}`, name: 'Main Unit', status: 'vacant', tenant: '' }],
                     occupancy: { occupied: 0, total: 1 },
                     transactions: [],
@@ -209,8 +214,8 @@ const Onboarding = ({ onComplete }) => {
 
                 {step === 1 && (
                     <div className="step-content animate-fade-in">
-                        <h2 style={{ fontSize: '2rem', marginBottom: '8px', fontWeight: 800 }}>Welcome to Skynet</h2>
-                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Choose your role to get started</p>
+                        <h2 style={{ fontSize: '2rem', marginBottom: '8px', fontWeight: 800 }}>Welcome to Araya Home</h2>
+                        <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Property management in minutes. Choose your role to get started.</p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '32px' }}>
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '12px' }}>
@@ -241,40 +246,63 @@ const Onboarding = ({ onComplete }) => {
                             </div>
                         </div>
 
-                        <div style={{ display: 'grid', gap: '12px' }}>
-                            {[
-                                { id: 'pmc', icon: '🏢', title: 'Property Manager', desc: 'Portfolios & Teams' },
-                                { id: 'owner', icon: '🔑', title: 'Property Owner', desc: 'Yield & Performance' },
-                                { id: 'tenant', icon: '🏠', title: 'Tenant', desc: 'Payments & Support' }
-                            ].map(item => (
+                        {!isRoleLocked ? (
+                            <div style={{ display: 'grid', gap: '12px' }}>
+                                {[
+                                    { id: 'pmc', icon: '🏢', title: 'Property Manager', desc: 'Portfolios & Teams' },
+                                    { id: 'owner', icon: '🔑', title: 'Property Owner', desc: 'Yield & Performance' },
+                                    { id: 'tenant', icon: '🏠', title: 'Tenant', desc: 'Payments & Support' }
+                                ].map(item => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handleRoleSelect(item.id)}
+                                        disabled={loading || !userName}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '16px',
+                                            padding: '16px',
+                                            background: 'rgba(255,255,255,0.03)',
+                                            border: '1px solid var(--glass-border)',
+                                            borderRadius: '12px',
+                                            cursor: (loading || !userName) ? 'not-allowed' : 'pointer',
+                                            textAlign: 'left',
+                                            transition: 'all 0.2s',
+                                            color: 'white',
+                                            opacity: !userName ? 0.5 : 1
+                                        }}
+                                        className="role-card-hover"
+                                    >
+                                        <span style={{ fontSize: '1.8rem' }}>{item.icon}</span>
+                                        <div>
+                                            <div style={{ fontWeight: 700, fontSize: '1rem' }}>{item.title}</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.desc}</div>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                <div style={{
+                                    padding: '16px',
+                                    background: 'rgba(99, 102, 241, 0.12)',
+                                    border: '1px solid rgba(99, 102, 241, 0.35)',
+                                    borderRadius: '12px',
+                                    color: 'white',
+                                    fontWeight: 700
+                                }}>
+                                    Your role: {currentUser?.role || 'user'}
+                                </div>
                                 <button
-                                    key={item.id}
-                                    onClick={() => handleRoleSelect(item.id)}
+                                    onClick={() => handleRoleSelect(currentUser?.role)}
                                     disabled={loading || !userName}
-                                    style={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '16px',
-                                        padding: '16px',
-                                        background: 'rgba(255,255,255,0.03)',
-                                        border: '1px solid var(--glass-border)',
-                                        borderRadius: '12px',
-                                        cursor: (loading || !userName) ? 'not-allowed' : 'pointer',
-                                        textAlign: 'left',
-                                        transition: 'all 0.2s',
-                                        color: 'white',
-                                        opacity: !userName ? 0.5 : 1
-                                    }}
-                                    className="role-card-hover"
+                                    className="btn-primary"
+                                    style={{ padding: '14px', borderRadius: '12px' }}
                                 >
-                                    <span style={{ fontSize: '1.8rem' }}>{item.icon}</span>
-                                    <div>
-                                        <div style={{ fontWeight: 700, fontSize: '1rem' }}>{item.title}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{item.desc}</div>
-                                    </div>
+                                    {loading ? 'Processing...' : 'Continue'}
                                 </button>
-                            ))}
-                        </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -309,9 +337,30 @@ const Onboarding = ({ onComplete }) => {
                                         type="number"
                                         value={propertyPrice}
                                         onChange={(e) => setPropertyPrice(e.target.value)}
-                                        placeholder="Purchase Price ($)"
+                                        placeholder={`Purchase Price (${propertyCurrency})`}
                                         style={{ width: '100%', padding: '16px', background: 'rgba(0,0,0,0.2)', border: '1px solid #333', borderRadius: '12px', color: 'white' }}
                                     />
+                                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                                        {currencyOptions.map((option) => (
+                                            <button
+                                                key={option}
+                                                type="button"
+                                                onClick={() => setPropertyCurrency(option)}
+                                                style={{
+                                                    padding: '8px 14px',
+                                                    borderRadius: '999px',
+                                                    border: propertyCurrency === option ? '1px solid var(--accent-primary)' : '1px solid #333',
+                                                    background: propertyCurrency === option ? 'rgba(99, 102, 241, 0.2)' : 'transparent',
+                                                    color: propertyCurrency === option ? 'white' : 'var(--text-secondary)',
+                                                    fontSize: '0.8rem',
+                                                    fontWeight: 700,
+                                                    cursor: 'pointer'
+                                                }}
+                                            >
+                                                {option}
+                                            </button>
+                                        ))}
+                                    </div>
                                     {role === 'pmc' && (
                                         <div style={{ marginTop: '8px' }}>
                                             <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'block', marginBottom: '8px' }}>OWNER LINKING (OPTIONAL)</label>
@@ -381,7 +430,7 @@ const Onboarding = ({ onComplete }) => {
                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                                             <button
                                                 onClick={() => setManagementType('self')}
-                                                style={{ padding: '12px', borderRadius: '8px', border: managementType === 'self' ? '1px solid var(--accent-primary)' : '1px solid #333', background: managementType === 'self' ? 'rgba(99, 102, 2 INDIGO, 0.2)' : 'transparent', color: 'white' }}
+                                                style={{ padding: '12px', borderRadius: '8px', border: managementType === 'self' ? '1px solid var(--accent-primary)' : '1px solid #333', background: managementType === 'self' ? 'rgba(99, 102, 241, 0.2)' : 'transparent', color: 'white' }}
                                             >
                                                 Independent
                                             </button>

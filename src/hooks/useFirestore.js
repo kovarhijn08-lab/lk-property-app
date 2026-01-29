@@ -24,6 +24,32 @@ const RETRYABLE_ERRORS = new Set([
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+const normalizeErrorCode = (error) => {
+    if (!error?.code) return 'unknown';
+    return String(error.code).replace('firestore/', '');
+};
+
+const isPermissionDenied = (error) => {
+    const code = normalizeErrorCode(error);
+    if (code === 'permission-denied') return true;
+    return /permission/i.test(error?.message || '');
+};
+
+const logAccessDenied = (context, error, operation) => {
+    if (!isPermissionDenied(error)) return false;
+    skynet.warn('Access denied by Firestore rules', {
+        action: 'db.access.denied',
+        entityType: context.collection,
+        entityId: context.docId,
+        metadata: {
+            operation,
+            code: normalizeErrorCode(error),
+            message: error?.message
+        }
+    });
+    return true;
+};
+
 const withRetry = async (fn, context, attempts = 3, baseDelayMs = 300) => {
     let lastError = null;
 
@@ -32,7 +58,7 @@ const withRetry = async (fn, context, attempts = 3, baseDelayMs = 300) => {
             return await fn();
         } catch (error) {
             lastError = error;
-            const code = error?.code?.replace('firestore/', '') || error?.code || 'unknown';
+            const code = normalizeErrorCode(error);
             const isRetryable = RETRYABLE_ERRORS.has(code);
 
             if (!isRetryable || attempt === attempts - 1) {
@@ -89,6 +115,7 @@ export const useFirestoreDoc = (collectionName, docId) => {
             },
             (err) => {
                 console.error('Firestore error:', err);
+                logAccessDenied({ collection: collectionName, docId }, err, 'realtime.get');
                 setError(err.message);
                 setLoading(false);
             }
@@ -146,6 +173,7 @@ export const useFirestoreCollection = (collectionName, queryConstraints = [], de
             },
             (err) => {
                 console.error(`Firestore collection error (${collectionName}):`, err);
+                logAccessDenied({ collection: collectionName, docId: null }, err, 'realtime.list');
                 setError(err.message);
                 setLoading(false);
             }
@@ -181,6 +209,7 @@ export const firestoreOperations = {
             return { success: true, id: docId };
         } catch (error) {
             console.error('Set document error:', error);
+            logAccessDenied({ collection: collectionName, docId }, error, 'set');
             skynet.error(`FAILED SET in ${collectionName}: ${docId}`, {
                 error: error.message,
                 action: 'db.set.fail',
@@ -208,6 +237,7 @@ export const firestoreOperations = {
             return { success: true };
         } catch (error) {
             console.error('Update document error:', error);
+            logAccessDenied({ collection: collectionName, docId }, error, 'update');
             skynet.error(`FAILED UPDATE in ${collectionName}: ${docId}`, {
                 error: error.message,
                 action: 'db.update.fail',
@@ -232,6 +262,7 @@ export const firestoreOperations = {
             return { success: true };
         } catch (error) {
             console.error('Delete document error:', error);
+            logAccessDenied({ collection: collectionName, docId }, error, 'delete');
             skynet.error(`FAILED DELETE in ${collectionName}: ${docId}`, {
                 error: error.message,
                 action: 'db.delete.fail',
@@ -258,6 +289,7 @@ export const firestoreOperations = {
             }
         } catch (error) {
             console.error('Get document error:', error);
+            logAccessDenied({ collection: collectionName, docId }, error, 'get');
             return { success: false, error: error.message };
         }
     },
@@ -279,6 +311,7 @@ export const firestoreOperations = {
             return { success: true, data: items };
         } catch (error) {
             console.error('Get collection error:', error);
+            logAccessDenied({ collection: collectionName, docId: null }, error, 'list');
             return { success: false, error: error.message };
         }
     }

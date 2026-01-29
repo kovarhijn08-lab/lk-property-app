@@ -1,7 +1,7 @@
 # Design Specification: Mobile Companion App (PWA)
 
 ## Overview
-The Mobile Companion App for **Smart Pocket Ledger** is designed as a "field tool" for property owners. It doesn't replicate the full desktop experience but focuses on high-frequency, on-the-go tasks: maintenance, task management, rapid data entry, and vital property info.
+The Mobile Companion App for **Araya Home** is designed as a "field tool" for property owners. It doesn't replicate the full desktop experience but focuses on high-frequency, on-the-go tasks: maintenance, task management, rapid data entry, and vital property info.
 
 ## Architecture
 - **Tech Stack**: Progressive Web App (PWA) built with React.

@@ -1,4 +1,4 @@
-# Product Spec v1 — Smart Pocket Ledger
+# Product Spec v1 — Araya Home
 
 ## 1. Mission
 Create the most reliable and transparent property management platform for owners, tenants, and PMCs worldwide, with real‑time visibility, automation, and audit‑grade accountability.

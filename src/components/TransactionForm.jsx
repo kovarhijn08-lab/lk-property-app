@@ -64,7 +64,7 @@ const TransactionForm = ({ onSubmit, onClose, initialData, vendors = [] }) => {
             position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
             background: 'rgba(0,0,0,0.8)',
             display: 'flex', alignItems: 'end', justifyContent: 'center',
-            zIndex: 100
+            zIndex: 2200
         }}>
             <div className="glass-panel" style={{
                 width: '100%', maxWidth: '480px',

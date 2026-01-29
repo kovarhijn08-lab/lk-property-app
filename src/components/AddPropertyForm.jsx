@@ -15,6 +15,12 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
     const [purchasePrice, setPurchasePrice] = useState('');
     const [isUnderConstruction, setIsUnderConstruction] = useState(false);
     const [tags, setTags] = useState([]); // [NEW]
+    const [currency, setCurrency] = useState('USD');
+    const [monthlyIncome, setMonthlyIncome] = useState('');
+    const [monthlyExpenses, setMonthlyExpenses] = useState('');
+    const [showAdvanced, setShowAdvanced] = useState(false);
+
+    const currencyOptions = ['USD', 'THB', 'AED', 'IDR', 'RUB'];
 
     const [errors, setErrors] = useState({});
     const [touched, setTouched] = useState({});
@@ -27,10 +33,11 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
             units,
             address,
             marketValue: purchasePrice, // marketValue rule used for purchasePrice too
-            purchasePrice
+            purchasePrice,
+            monthlyIncome: monthlyIncome ? monthlyIncome : undefined
         });
         setErrors(currentErrors);
-    }, [name, type, units, address, purchasePrice]);
+    }, [name, type, units, address, purchasePrice, monthlyIncome]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -44,6 +51,10 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
             address,
             purchasePrice: parseFloat(purchasePrice),
             marketValue: parseFloat(purchasePrice),
+            currency,
+            income: parseFloat(monthlyIncome) || 0,
+            expenses: parseFloat(monthlyExpenses) || 0,
+            occupancyStatus: 'vacant',
             transactions: [],
             units: Array.from({ length: parseInt(units) || 1 }, (_, i) => ({
                 id: `unit-${Date.now()}-${i}`,
@@ -82,6 +93,10 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
             width="480px"
         >
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px', paddingBottom: '120px' }}>
+
+                <div style={{ padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(99, 102, 241, 0.3)', background: 'rgba(99, 102, 241, 0.08)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    {t('property.quickStartHint')}
+                </div>
 
                 <div style={{ marginBottom: '20px' }}>
                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
@@ -275,9 +290,38 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     {renderFieldError('address', address)}
                 </div>
 
+                <div style={{ marginBottom: '20px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                        {t('property.currency')}
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        {currencyOptions.map(opt => (
+                            <button
+                                key={opt}
+                                type="button"
+                                onClick={() => setCurrency(opt)}
+                                style={{
+                                    padding: '10px 14px',
+                                    borderRadius: '10px',
+                                    border: currency === opt ? '1px solid rgba(139, 92, 246, 0.5)' : '1px solid var(--glass-border)',
+                                    background: currency === opt ? 'rgba(99, 102, 241, 0.18)' : 'rgba(255,255,255,0.03)',
+                                    color: currency === opt ? 'white' : 'var(--text-secondary)',
+                                    fontWeight: 700,
+                                    fontSize: '0.75rem',
+                                    cursor: 'pointer',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: '0.5px'
+                                }}
+                            >
+                                {opt}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 <div style={{ marginBottom: '40px' }}>
                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                        {t('property.purchasePrice')} *
+                        {t('property.purchasePrice')} ({currency}) *
                     </label>
                     <input
                         type="number"
@@ -285,6 +329,8 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                         onBlur={() => setTouched(prev => ({ ...prev, marketValue: true }))}
                         onChange={(e) => setPurchasePrice(e.target.value)}
                         placeholder="500000"
+                        inputMode="decimal"
+                        min="0"
                         style={{
                             width: '100%',
                             padding: '14px',
@@ -301,13 +347,85 @@ const AddPropertyForm = ({ onSubmit, onClose }) => {
                     {renderFieldError('marketValue', purchasePrice)}
                 </div>
 
-                {/* [NEW] Tags Section */}
-                <div style={{ marginBottom: '40px' }}>
-                    <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                        {t('common.tags')}
-                    </label>
-                    <TagInput tags={tags} onChange={setTags} />
+                <div style={{ marginBottom: '20px' }}>
+                    <button
+                        type="button"
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        style={{
+                            width: '100%',
+                            padding: '12px',
+                            borderRadius: '12px',
+                            border: '1px solid var(--glass-border)',
+                            background: 'rgba(255,255,255,0.02)',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 800,
+                            fontSize: '0.75rem',
+                            textTransform: 'uppercase',
+                            letterSpacing: '1px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        {showAdvanced ? t('property.hideAdvanced') : t('property.showAdvanced')}
+                    </button>
                 </div>
+
+                {showAdvanced && (
+                    <>
+                        <div style={{ marginBottom: '20px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                                    {t('property.income')} ({currency})
+                                </label>
+                                <input
+                                    type="number"
+                                    value={monthlyIncome}
+                                    onChange={(e) => setMonthlyIncome(e.target.value)}
+                                    placeholder="0"
+                                    inputMode="decimal"
+                                    min="0"
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        border: '1px solid var(--glass-border)',
+                                        borderRadius: '12px',
+                                        color: 'white',
+                                        fontSize: '0.95rem'
+                                    }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                                    {t('property.expenses')} ({currency})
+                                </label>
+                                <input
+                                    type="number"
+                                    value={monthlyExpenses}
+                                    onChange={(e) => setMonthlyExpenses(e.target.value)}
+                                    placeholder="0"
+                                    inputMode="decimal"
+                                    min="0"
+                                    style={{
+                                        width: '100%',
+                                        padding: '14px',
+                                        background: 'rgba(0,0,0,0.2)',
+                                        border: '1px solid var(--glass-border)',
+                                        borderRadius: '12px',
+                                        color: 'white',
+                                        fontSize: '0.95rem'
+                                    }}
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '40px' }}>
+                            <label style={{ display: 'block', marginBottom: '8px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                                {t('common.tags')}
+                            </label>
+                            <TagInput tags={tags} onChange={setTags} />
+                        </div>
+                    </>
+                )}
 
                 <div style={{ display: 'flex', gap: '16px' }}>
                     <button

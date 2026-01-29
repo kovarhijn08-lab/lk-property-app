@@ -55,7 +55,7 @@ class ErrorBoundary extends React.Component {
                         <div style={{ fontSize: '4rem', marginBottom: '20px' }}>⚡</div>
                         <h1 style={{ fontSize: '1.5rem', marginBottom: '16px', color: '#F43F5E' }}>Application Crash Detected</h1>
                         <p style={{ color: '#94A3B8', lineHeight: 1.6, marginBottom: '32px' }}>
-                            Something went wrong while rendering this page. Skynet has recorded the crash details.
+                            Something went wrong while rendering this page. Araya Home has recorded the crash details.
                         </p>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

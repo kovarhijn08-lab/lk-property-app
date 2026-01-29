@@ -11,6 +11,7 @@ const NavigationDrawer = ({
     onOpenSettings,
     onAddProperty,
     onOpenCalendar,
+    onOpenChats,
     user,
     onLogout
 }) => {
@@ -51,6 +52,7 @@ const NavigationDrawer = ({
         },
         // Only show calendar to PMC/Owners
         ...(!isTenant ? [{ id: 'calendar', icon: <CalendarIcon size={20} />, label: t('common.calendar'), action: () => onOpenCalendar() }] : []),
+        ...(!isTenant ? [{ id: 'chats', icon: <InfoIcon size={20} />, label: t('common.chats') || 'Chats', action: () => onOpenChats && onOpenChats() }] : []),
     ];
 
     // Swipe to close handler

@@ -52,6 +52,7 @@ const AdminDashboard = ({ onClose }) => {
     const [loading, setLoading] = useState(false);
     const [priorityFilter, setPriorityFilter] = useState('ALL');
     const [selectedLog, setSelectedLog] = useState(null);
+    const [logCopied, setLogCopied] = useState(false);
     const [backupProgress, setBackupProgress] = useState(0);
     const [isBackingUp, setIsBackingUp] = useState(false);
     const [backupStage, setBackupStage] = useState('');
@@ -66,6 +67,16 @@ const AdminDashboard = ({ onClose }) => {
         a.download = filename;
         a.click();
         URL.revokeObjectURL(url);
+    };
+
+    const copyLogJson = async (log) => {
+        try {
+            await navigator.clipboard.writeText(JSON.stringify(log, null, 2));
+            setLogCopied(true);
+            setTimeout(() => setLogCopied(false), 2000);
+        } catch (e) {
+            console.error('Clipboard copy failed', e);
+        }
     };
 
     const isAdmin = (
@@ -890,86 +901,94 @@ const AdminDashboard = ({ onClose }) => {
                                                 ) : (
                                                     <>
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <select
-                                                                value={pendingRoleChanges[user.id] || user.role || 'user'}
-                                                                onChange={(e) => {
-                                                                    const newRole = e.target.value;
-                                                                    setPendingRoleChanges(prev => ({
-                                                                        ...prev,
-                                                                        [user.id]: newRole
-                                                                    }));
-                                                                    skynet.info(`Admin selected new role for ${user.email}`, { targetUid: user.id, role: newRole });
-                                                                }}
-                                                                style={{
-                                                                    background: '#222',
-                                                                    border: '1px solid var(--glass-border)',
-                                                                    borderRadius: '4px',
-                                                                    color: 'white',
-                                                                    fontSize: '0.65rem',
-                                                                    padding: '4px 8px',
-                                                                    cursor: 'pointer'
-                                                                }}
-                                                            >
-                                                                <option value="user">Standard User</option>
-                                                                <option value="pmc">Property Manager (PMC)</option>
-                                                                <option value="owner">Investor (Owner)</option>
-                                                                <option value="tenant">Resident (Tenant)</option>
-                                                                <option value="admin">Global Admin</option>
-                                                            </select>
+                                                            {isAdmin ? (
+                                                                <>
+                                                                    <select
+                                                                        value={pendingRoleChanges[user.id] || user.role || 'user'}
+                                                                        onChange={(e) => {
+                                                                            const newRole = e.target.value;
+                                                                            setPendingRoleChanges(prev => ({
+                                                                                ...prev,
+                                                                                [user.id]: newRole
+                                                                            }));
+                                                                            skynet.info(`Admin selected new role for ${user.email}`, { targetUid: user.id, role: newRole });
+                                                                        }}
+                                                                        style={{
+                                                                            background: '#222',
+                                                                            border: '1px solid var(--glass-border)',
+                                                                            borderRadius: '4px',
+                                                                            color: 'white',
+                                                                            fontSize: '0.65rem',
+                                                                            padding: '4px 8px',
+                                                                            cursor: 'pointer'
+                                                                        }}
+                                                                    >
+                                                                        <option value="user">Standard User</option>
+                                                                        <option value="pmc">Property Manager (PMC)</option>
+                                                                        <option value="owner">Investor (Owner)</option>
+                                                                        <option value="tenant">Resident (Tenant)</option>
+                                                                        <option value="admin">Global Admin</option>
+                                                                    </select>
 
-                                                            {pendingRoleChanges[user.id] && pendingRoleChanges[user.id] !== user.role && (
-                                                                <button
-                                                                    onClick={async () => {
-                                                                        const newRole = pendingRoleChanges[user.id];
-                                                                        skynet.info(`Admin saving role change for ${user.email}`, { targetUid: user.id, to: newRole });
+                                                                    {pendingRoleChanges[user.id] && pendingRoleChanges[user.id] !== user.role && (
+                                                                        <button
+                                                                            onClick={async () => {
+                                                                                const newRole = pendingRoleChanges[user.id];
+                                                                                skynet.info(`Admin saving role change for ${user.email}`, { targetUid: user.id, to: newRole });
 
-                                                                        try {
-                                                                            const idToken = await auth.currentUser.getIdToken();
-                                                                            const response = await fetch('/api/admin/update-user', {
-                                                                                method: 'POST',
-                                                                                headers: {
-                                                                                    'Content-Type': 'application/json',
-                                                                                    'Authorization': `Bearer ${idToken}`
-                                                                                },
-                                                                                body: JSON.stringify({
-                                                                                    targetUid: user.id,
-                                                                                    newRole: newRole
-                                                                                })
-                                                                            });
+                                                                                try {
+                                                                                    const idToken = await auth.currentUser.getIdToken();
+                                                                                    const response = await fetch('/api/admin/update-user', {
+                                                                                        method: 'POST',
+                                                                                        headers: {
+                                                                                            'Content-Type': 'application/json',
+                                                                                            'Authorization': `Bearer ${idToken}`
+                                                                                        },
+                                                                                        body: JSON.stringify({
+                                                                                            targetUid: user.id,
+                                                                                            newRole: newRole
+                                                                                        })
+                                                                                    });
 
-                                                                            const res = await response.json();
+                                                                                    const res = await response.json();
 
-                                                                            if (response.ok) {
-                                                                                skynet.success(`Role updated via API for ${user.email}`, { targetUid: user.id, role: newRole });
-                                                                                setPendingRoleChanges(prev => {
-                                                                                    const next = { ...prev };
-                                                                                    delete next[user.id];
-                                                                                    return next;
-                                                                                });
-                                                                                alert('Success!');
-                                                                            } else {
-                                                                                skynet.error(`API Role update failed for ${user.email}`, { error: res.error });
-                                                                                alert('Error: ' + res.error);
-                                                                            }
-                                                                        } catch (err) {
-                                                                            skynet.error(`Connection error during role update`, { error: err.message });
-                                                                            alert('Connection failed');
-                                                                        }
-                                                                    }}
-                                                                    style={{
-                                                                        background: 'var(--accent-success)',
-                                                                        border: 'none',
-                                                                        color: 'white',
-                                                                        padding: '4px 8px',
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '0.6rem',
-                                                                        cursor: 'pointer',
-                                                                        fontWeight: 800,
-                                                                        animation: 'pulse 2s infinite'
-                                                                    }}
-                                                                >
-                                                                    SAVE
-                                                                </button>
+                                                                                    if (response.ok) {
+                                                                                        skynet.success(`Role updated via API for ${user.email}`, { targetUid: user.id, role: newRole });
+                                                                                        setPendingRoleChanges(prev => {
+                                                                                            const next = { ...prev };
+                                                                                            delete next[user.id];
+                                                                                            return next;
+                                                                                        });
+                                                                                        alert('Success!');
+                                                                                    } else {
+                                                                                        skynet.error(`API Role update failed for ${user.email}`, { error: res.error });
+                                                                                        alert('Error: ' + res.error);
+                                                                                    }
+                                                                                } catch (err) {
+                                                                                    skynet.error(`Connection error during role update`, { error: err.message });
+                                                                                    alert('Connection failed');
+                                                                                }
+                                                                            }}
+                                                                            style={{
+                                                                                background: 'var(--accent-success)',
+                                                                                border: 'none',
+                                                                                color: 'white',
+                                                                                padding: '4px 8px',
+                                                                                borderRadius: '4px',
+                                                                                fontSize: '0.6rem',
+                                                                                cursor: 'pointer',
+                                                                                fontWeight: 800,
+                                                                                animation: 'pulse 2s infinite'
+                                                                            }}
+                                                                        >
+                                                                            SAVE
+                                                                        </button>
+                                                                    )}
+                                                                </>
+                                                            ) : (
+                                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                                                                    {user.role || 'user'}
+                                                                </span>
                                                             )}
                                                         </div>
                                                         <button
@@ -1082,7 +1101,7 @@ const AdminDashboard = ({ onClose }) => {
                                 <h3 style={{ marginTop: 0, fontSize: '1.1rem' }}>Global Security Monitor</h3>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#10B981' }}>
                                     <div className="pulse" style={{ width: '8px', height: '8px', background: '#10B981', borderRadius: '50%' }}></div>
-                                    <span style={{ fontSize: '0.9rem' }}>Skynet is actively patrolling Firestore. 0 unauthorized attempts today.</span>
+                                    <span style={{ fontSize: '0.9rem' }}>Security Sentinel is actively monitoring Firestore. 0 unauthorized attempts today.</span>
                                 </div>
                             </section>
                         </div>
@@ -1562,7 +1581,17 @@ const AdminDashboard = ({ onClose }) => {
                             )}
 
                             {/* Actions in Detail Modal */}
-                            <div style={{ marginTop: '12px', display: 'flex', gap: '12px' }}>
+                            <div style={{ marginTop: '12px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                                <button
+                                    onClick={() => copyLogJson(selectedLog)}
+                                    style={{
+                                        flex: 1, padding: '12px', borderRadius: '8px',
+                                        background: logCopied ? '#10B981' : '#222',
+                                        color: 'white', border: '1px solid #333', cursor: 'pointer'
+                                    }}
+                                >
+                                    {logCopied ? t('admin.logs.copied') : t('admin.logs.copy')}
+                                </button>
                                 {(selectedLog.type === 'snapshot' || selectedLog.type === 'deletion_snapshot') && (
                                     <button
                                         onClick={() => { handleRestore(selectedLog); setSelectedLog(null); }}

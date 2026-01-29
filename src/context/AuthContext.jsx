@@ -123,39 +123,60 @@ export const AuthProvider = ({ children }) => {
         try {
             let linkedPropertyId = null;
             let linkedUnitId = null;
+            let inviteId = null;
+            let finalRole = role;
+
+            if (role === 'pmc' && !inviteToken) {
+                skynet.warn('PMC signup blocked: invite required', {
+                    action: 'auth.signup.blocked',
+                    entityType: 'user',
+                    metadata: { role: 'pmc', reason: 'invite_required' }
+                });
+                return { success: false, error: 'PMC registration is invite-only. Please request an invitation from Admin/Owner.' };
+            }
 
             // 1. Create Firebase User FIRST (to obtain UID for validation)
             const res = await createUserWithEmailAndPassword(auth, email, password);
             const uid = res.user.uid;
 
-            let inviteId = null;
-
-            // 2. Invitation Validation for Tenants (Now as Authenticated User)
-            if (role === 'tenant') {
-                if (!inviteToken) {
-                    await deleteUser(res.user);
-                    return { success: false, error: 'Registration for tenants requires an invitation link.' };
-                }
-
+            // 2. Invitation Validation for Invite-Based Roles (tenant/pmc)
+            if (inviteToken) {
                 const hashedToken = await hashToken(inviteToken);
-                // Use getDocument instead of getCollection for better security (no list required)
                 const inviteSnapshot = await firestoreOperations.getDocument('invitations', hashedToken);
 
                 if (!inviteSnapshot.success) {
+                    skynet.warn('Invite validation failed', {
+                        action: 'auth.invite.denied',
+                        entityType: 'invitation',
+                        metadata: { reason: 'not_found' }
+                    });
                     await deleteUser(res.user);
                     return { success: false, error: 'Invalid or expired invitation link.' };
                 }
 
                 const inviteData = inviteSnapshot.data;
                 inviteId = inviteData.id;
+                finalRole = inviteData.role || 'tenant';
 
                 // Check status and expiry
                 if (inviteData.status !== 'active') {
+                    skynet.warn('Invite validation failed', {
+                        action: 'auth.invite.denied',
+                        entityType: 'invitation',
+                        entityId: inviteId,
+                        metadata: { reason: 'status_not_active', status: inviteData.status }
+                    });
                     await deleteUser(res.user);
                     return { success: false, error: 'This invitation has already been used or expired.' };
                 }
 
                 if (new Date(inviteData.expiresAt) < new Date()) {
+                    skynet.warn('Invite validation failed', {
+                        action: 'auth.invite.denied',
+                        entityType: 'invitation',
+                        entityId: inviteId,
+                        metadata: { reason: 'expired', expiresAt: inviteData.expiresAt }
+                    });
                     await firestoreOperations.updateDocument('invitations', inviteId, { status: 'expired' });
                     await deleteUser(res.user);
                     return { success: false, error: 'Invitation link has expired.' };
@@ -164,7 +185,6 @@ export const AuthProvider = ({ children }) => {
                 linkedPropertyId = inviteData.propertyId;
                 linkedUnitId = inviteData.unitId;
 
-                // Mark as used AND bind to UID
                 const updateRes = await firestoreOperations.updateDocument('invitations', inviteId, {
                     status: 'used',
                     usedAt: new Date().toISOString(),
@@ -172,9 +192,23 @@ export const AuthProvider = ({ children }) => {
                 });
 
                 if (!updateRes.success) {
+                    skynet.error('Invite authorization failed', {
+                        action: 'auth.invite.update.fail',
+                        entityType: 'invitation',
+                        entityId: inviteId,
+                        metadata: { reason: 'update_failed', error: updateRes.error }
+                    });
                     await deleteUser(res.user);
                     return { success: false, error: 'Failed to authorize invitation. Please try again.' };
                 }
+            } else if (role === 'tenant') {
+                skynet.warn('Tenant signup blocked: invite required', {
+                    action: 'auth.signup.blocked',
+                    entityType: 'user',
+                    metadata: { role: 'tenant', reason: 'invite_required' }
+                });
+                await deleteUser(res.user);
+                return { success: false, error: 'Registration for tenants requires an invitation link.' };
             }
 
             await updateProfile(res.user, { displayName: name });
@@ -184,8 +218,8 @@ export const AuthProvider = ({ children }) => {
                 id: res.user.uid,
                 name,
                 email,
-                role: role,
-                onboardingCompleted: role === 'tenant', // Tenants skip onboarding for now
+                role: finalRole,
+                onboardingCompleted: finalRole === 'tenant', // Tenants skip onboarding for now
                 createdAt: new Date().toISOString(),
                 preferences: { currency: 'USD', isDemoMode: false },
                 linkedPropertyId,
@@ -199,7 +233,7 @@ export const AuthProvider = ({ children }) => {
                 console.error('[AuthContext] User document creation failed, rolling back...', err);
 
                 // Rollback Invitation if it was marked as used
-                if (role === 'tenant' && inviteId) {
+                if (inviteId) {
                     await firestoreOperations.updateDocument('invitations', inviteId, {
                         status: 'active',
                         usedAt: null,
@@ -213,7 +247,7 @@ export const AuthProvider = ({ children }) => {
             }
 
             // 4. Link Tenant to Property/Unit
-            if (role === 'tenant' && linkedPropertyId) {
+            if (finalRole === 'tenant' && linkedPropertyId) {
                 const propDoc = await firestoreOperations.getDocument('properties', linkedPropertyId);
                 if (propDoc.success) {
                     const propData = propDoc.data;
@@ -240,28 +274,53 @@ export const AuthProvider = ({ children }) => {
                 }
             }
 
-            skynet.log(`New user registered: ${email} as ${role}`, 'success', {
+            if (finalRole === 'pmc' && linkedPropertyId) {
+                const propDoc = await firestoreOperations.getDocument('properties', linkedPropertyId);
+                if (propDoc.success) {
+                    const propData = propDoc.data;
+                    const managerIds = propData.managerIds || [];
+                    if (!managerIds.includes(res.user.uid)) {
+                        managerIds.push(res.user.uid);
+                    }
+                    await firestoreOperations.updateDocument('properties', linkedPropertyId, {
+                        managerIds
+                    });
+                }
+            }
+
+            skynet.log(`New user registered: ${email} as ${finalRole}`, 'success', {
                 actorId: res.user.uid,
                 action: 'auth.signup',
                 entityType: 'user',
                 entityId: res.user.uid,
-                metadata: { role, linkedPropertyId }
+                metadata: { role: finalRole, linkedPropertyId }
             });
 
             return { success: true, user: res.user };
         } catch (error) {
             console.error('[AuthContext] Signup Error:', error);
+            skynet.error('Auth Signup Error', { error: error.message, email });
+            // Ensure loading is set to false even on error
+            setLoading(false);
             return { success: false, error: error.message };
         }
     };
 
     const logout = async () => {
         const email = auth.currentUser?.email;
-        await signOut(auth);
-        skynet.log(`User logged out: ${email}`, 'info', {
-            actorId: auth.currentUser?.uid || 'unknown',
-            action: 'auth.logout'
-        });
+        const uid = auth.currentUser?.uid;
+
+        try {
+            await signOut(auth);
+            skynet.log(`User logged out: ${email}`, 'info', {
+                actorId: uid || 'anonymous',
+                action: 'auth.logout'
+            });
+        } catch (error) {
+            console.error('[AuthContext] Logout error:', error);
+        }
+
+        setCurrentUser(null);
         setGhostUser(null);
         return { success: true };
     };

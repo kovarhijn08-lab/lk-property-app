@@ -1,4 +1,4 @@
-# Project Map — Smart Pocket Ledger
+# Project Map — Araya Home
 
 This document is the canonical map of the project for handover to other LLMs or developers.
 

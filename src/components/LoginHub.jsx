@@ -24,10 +24,10 @@ const LoginHub = ({ onSelectPath }) => {
                     WebkitTextFillColor: 'transparent',
                     fontWeight: 900
                 }}>
-                    Smart Pocket Ledger
+                    Araya Home
                 </h1>
                 <p style={{ color: 'var(--text-secondary)', marginBottom: '40px' }}>
-                    Выберите ваш путь в системе управления недвижимостью
+                    Управление недвижимостью за минуты. Выберите ваш путь.
                 </p>
 
                 <div style={{
@@ -81,7 +81,7 @@ const LoginHub = ({ onSelectPath }) => {
                 </div>
 
                 <div style={{ marginTop: '40px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Регистрация жильцов доступна только по приглашению от управляющего.
+                    Регистрация жильцов и управляющих компаний доступна только по приглашению.
                 </div>
             </div>
         </div>

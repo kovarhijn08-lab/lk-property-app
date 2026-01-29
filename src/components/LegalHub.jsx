@@ -10,7 +10,7 @@ const LegalHub = ({ properties, onAddContract, onDeleteContract, onSignContract,
     // Aggregate all contracts from all properties
     const allContracts = useMemo(() => {
         return properties.flatMap(p =>
-            (p.contracts || []).map(c => ({ ...c, propertyName: p.name, propertyId: p.id }))
+            (p.contracts || []).map(c => ({ ...c, propertyName: p.name, propertyId: p.id, currency: c.currency || p.currency }))
         );
     }, [properties]);
 

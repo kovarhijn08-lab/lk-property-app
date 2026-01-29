@@ -4,11 +4,17 @@ const DocumentVault = ({ contracts, onDeleteContract }) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
 
-    const categories = ['All', 'Lease', 'Tax', 'Insurance', 'Utility', 'Other'];
+    const categories = ['All', 'Lease', 'Act', 'Invoice', 'Receipt', 'Tax', 'Insurance', 'Utility', 'Other'];
 
-    const filteredDocuments = contracts.filter(c => {
-        const matchesSearch = (c.tenantName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            c.propertyName?.toLowerCase().includes(searchQuery.toLowerCase()));
+    const filteredDocuments = (contracts || []).filter(c => {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = !query || (
+            c.tenantName?.toLowerCase().includes(query) ||
+            c.title?.toLowerCase().includes(query) ||
+            c.fileName?.toLowerCase().includes(query) ||
+            c.documentNumber?.toLowerCase().includes(query) ||
+            c.propertyName?.toLowerCase().includes(query)
+        );
 
         const category = c.category || 'Lease';
         const matchesCategory = selectedCategory === 'All' || category === selectedCategory;
@@ -21,6 +27,7 @@ const DocumentVault = ({ contracts, onDeleteContract }) => {
             case 'signed': return '✅';
             case 'draft': return '📝';
             case 'expired': return '❌';
+            case 'stored': return '📥';
             default: return '📄';
         }
     };
@@ -28,6 +35,9 @@ const DocumentVault = ({ contracts, onDeleteContract }) => {
     const getCategoryIcon = (category) => {
         switch (category) {
             case 'Lease': return '📜';
+            case 'Act': return '📑';
+            case 'Invoice': return '🧾';
+            case 'Receipt': return '🧾';
             case 'Tax': return '🏦';
             case 'Insurance': return '🛡️';
             case 'Utility': return '⚡';
@@ -35,15 +45,31 @@ const DocumentVault = ({ contracts, onDeleteContract }) => {
         }
     };
 
+    const formatCurrency = (value, currency = 'USD') => {
+        const amount = Number(value || 0);
+        try {
+            return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+        } catch (e) {
+            return `${currency} ${amount.toLocaleString()}`;
+        }
+    };
+
     const downloadContract = (contract) => {
+        const currency = contract.currency || 'USD';
         const content = `
 Contract ID: ${contract.id}
 Property: ${contract.propertyName || 'N/A'}
-Tenant: ${contract.tenantName}
-Start Date: ${contract.moveInDate || contract.startDate}
-Monthly Rent: $${contract.monthlyRent}
+Title: ${contract.title || contract.tenantName || 'Document'}
+Type: ${contract.category || 'Lease'}
+Document #: ${contract.documentNumber || 'N/A'}
+Tenant: ${contract.tenantName || 'N/A'}
+Start Date: ${contract.moveInDate || contract.startDate || 'N/A'}
+End Date: ${contract.endDate || 'N/A'}
+Monthly Rent: ${formatCurrency(contract.monthlyRent, currency)}
+File: ${contract.fileName || 'N/A'}
 Status: ${contract.status || 'Active'}
 Signature: ${contract.signature ? 'Signed' : 'Unsigned'}
+Uploaded: ${contract.uploadedAt || 'N/A'}
         `;
 
         const blob = new Blob([content], { type: 'text/plain' });
@@ -143,11 +169,16 @@ Signature: ${contract.signature ? 'Signed' : 'Unsigned'}
                                 </div>
                                 <div>
                                     <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '2px' }}>
-                                        {doc.tenantName || doc.name || 'Document'} {getStatusIcon(doc.status)}
+                                        {doc.title || doc.tenantName || doc.name || 'Document'} {getStatusIcon(doc.status)}
                                     </div>
                                     <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                                        {doc.propertyName} • {doc.date || doc.endDate}
+                                        {(doc.propertyName || 'Property')} • {doc.category || 'Lease'} {doc.documentNumber ? `• #${doc.documentNumber}` : ''} {doc.date || doc.endDate || doc.uploadedAt ? `• ${(doc.date || doc.endDate || doc.uploadedAt || '').toString().slice(0, 10)}` : ''}
                                     </div>
+                                    {doc.fileName && (
+                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                            📎 {doc.fileName}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 

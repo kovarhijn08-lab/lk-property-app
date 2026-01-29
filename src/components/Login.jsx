@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Login = ({ onLogin, onSwitchToSignup, onForgotPassword }) => {
+const Login = ({ onLogin, onSwitchToSignup, onForgotPassword, hideSignup = false }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -59,11 +59,25 @@ const Login = ({ onLogin, onSwitchToSignup, onForgotPassword }) => {
                         background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent'
-                    }}>Smart Pocket Ledger</h1>
+                    }}>Araya Home</h1>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        {isResetMode ? 'Reset your password' : 'Sign in to manage your properties'}
+                        {isResetMode ? 'Reset your password' : 'Property management in minutes.'}
                     </p>
                 </div>
+
+                {hideSignup && !isResetMode && (
+                    <div style={{
+                        padding: '12px',
+                        borderRadius: '8px',
+                        background: 'rgba(59, 130, 246, 0.12)',
+                        border: '1px solid rgba(59, 130, 246, 0.35)',
+                        color: '#93C5FD',
+                        fontSize: '0.85rem',
+                        marginBottom: '20px'
+                    }}>
+                        Регистрация жильцов доступна только по приглашению. Попросите ссылку у владельца или управляющей компании.
+                    </div>
+                )}
 
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     {error && (
@@ -205,24 +219,32 @@ const Login = ({ onLogin, onSwitchToSignup, onForgotPassword }) => {
                             </button>
                         ) : (
                             <div>
-                                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                                    Don't have an account?{' '}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={onSwitchToSignup}
-                                    style={{
-                                        background: 'none',
-                                        border: 'none',
-                                        color: 'var(--accent-primary)',
-                                        fontSize: '0.9rem',
-                                        fontWeight: 600,
-                                        cursor: 'pointer',
-                                        textDecoration: 'underline'
-                                    }}
-                                >
-                                    Sign Up
-                                </button>
+                                {!hideSignup ? (
+                                    <>
+                                        <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                                            Don't have an account?{' '}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={onSwitchToSignup}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--accent-primary)',
+                                                fontSize: '0.9rem',
+                                                fontWeight: 600,
+                                                cursor: 'pointer',
+                                                textDecoration: 'underline'
+                                            }}
+                                        >
+                                            Sign Up
+                                        </button>
+                                    </>
+                                ) : (
+                                    <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                        Registration is available only via invite link.
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>

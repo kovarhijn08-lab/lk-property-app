@@ -5,8 +5,9 @@ import TransactionList from './TransactionList';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { TrendingUpIcon, FileTextIcon, ActivityIcon, PieChartIcon } from './Icons';
 
-const OwnerPortal = ({ properties = [] }) => {
+const OwnerPortal = ({ properties = [], onAddProperty, onOpenProperty, onOpenLegal, onOpenAssistant }) => {
     const { t } = useLanguage();
+    const hasProperties = properties.length > 0;
 
     const totalPortfolioValue = properties.reduce((acc, p) => acc + (p.marketValue || 0), 0);
     const totalBasis = properties.reduce((acc, p) => acc + (p.purchasePrice || 0), 0);
@@ -36,6 +37,63 @@ const OwnerPortal = ({ properties = [] }) => {
                 <h1 style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>Investor Portal</h1>
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Welcome back. Here is your portfolio performance overview.</p>
             </header>
+
+            {!hasProperties && (
+                <div className="glass-panel" style={{ padding: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 800 }}>Start your first property</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '4px' }}>Add a property to unlock metrics and booking tools.</div>
+                    </div>
+                    <button
+                        onClick={() => onAddProperty && onAddProperty()}
+                        className="btn-primary"
+                        style={{ padding: '10px 16px', borderRadius: '10px' }}
+                    >
+                        + Add property
+                    </button>
+                </div>
+            )}
+
+            {hasProperties && (
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <div>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '1.5px', color: 'var(--accent-primary)', fontWeight: 800 }}>Quick actions</div>
+                        <div style={{ fontSize: '1rem', fontWeight: 800, marginTop: '4px' }}>Manage portfolio in 1–2 clicks</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            onClick={() => onAddProperty && onAddProperty()}
+                            className="btn-secondary"
+                            style={{ padding: '10px 14px', borderRadius: '10px' }}
+                        >
+                            + Property
+                        </button>
+                        <button
+                            onClick={() => onOpenProperty && onOpenProperty(properties[0]?.id)}
+                            className="btn-primary"
+                            style={{ padding: '10px 14px', borderRadius: '10px' }}
+                        >
+                            Open first property
+                        </button>
+                        <button
+                            onClick={() => onOpenLegal && onOpenLegal()}
+                            className="btn-secondary"
+                            style={{ padding: '10px 14px', borderRadius: '10px' }}
+                        >
+                            Legal Hub
+                        </button>
+                        {onOpenAssistant && (
+                            <button
+                                onClick={() => onOpenAssistant()}
+                                className="btn-secondary"
+                                style={{ padding: '10px 14px', borderRadius: '10px' }}
+                            >
+                                {t('assistant.openChat')}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px' }}>
                 <MetricCard

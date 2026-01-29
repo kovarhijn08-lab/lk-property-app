@@ -12,8 +12,11 @@ const BookingForm = ({ property, onAdd, onClose, initialData }) => {
     const [maintenanceExpense, setMaintenanceExpense] = useState(initialData?.maintenanceExpense || '');
     const [autoCleaning, setAutoCleaning] = useState(initialData?.autoCleaning ?? true);
     const [notes, setNotes] = useState(initialData?.notes || '');
+    const currency = property?.currency || 'USD';
 
     const existingBookings = property?.bookings || [];
+    const isGuestBooking = bookingType === 'guest';
+    const isFormReady = !!checkIn && !!checkOut && (!isGuestBooking || guestName.trim().length > 0);
 
     const handleDateSelect = (inDate, outDate) => {
         setCheckIn(inDate);
@@ -231,13 +234,14 @@ const BookingForm = ({ property, onAdd, onClose, initialData }) => {
                                 <>
                                     <div>
                                         <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                                            Total Price ($)
+                                            Total Price ({currency})
                                         </label>
                                         <input
                                             type="number"
                                             value={totalPrice}
                                             onChange={(e) => setTotalPrice(e.target.value)}
                                             placeholder="0"
+                                            min="0"
                                             style={{
                                                 width: '100%',
                                                 padding: '12px',
@@ -251,13 +255,14 @@ const BookingForm = ({ property, onAdd, onClose, initialData }) => {
                                     </div>
                                     <div>
                                         <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                                            Deposit ($)
+                                            Deposit ({currency})
                                         </label>
                                         <input
                                             type="number"
                                             value={securityDeposit}
                                             onChange={(e) => setSecurityDeposit(e.target.value)}
                                             placeholder="0"
+                                            min="0"
                                             style={{
                                                 width: '100%',
                                                 padding: '12px',
@@ -273,13 +278,14 @@ const BookingForm = ({ property, onAdd, onClose, initialData }) => {
                             ) : (
                                 <div style={{ gridColumn: 'span 2' }}>
                                     <label style={{ display: 'block', fontSize: '0.85rem', color: '#F59E0B', marginBottom: '6px' }}>
-                                        Estimated Repair Expense ($)
+                                        Estimated Repair Expense ({currency})
                                     </label>
                                     <input
                                         type="number"
                                         value={maintenanceExpense}
                                         onChange={(e) => setMaintenanceExpense(e.target.value)}
                                         placeholder="Enter cost of repair"
+                                        min="0"
                                         style={{
                                             width: '100%',
                                             padding: '12px',
@@ -333,6 +339,47 @@ const BookingForm = ({ property, onAdd, onClose, initialData }) => {
                             />
                         </div>
 
+                        {/* Summary */}
+                        <div style={{
+                            padding: '12px',
+                            borderRadius: '10px',
+                            border: '1px solid rgba(255,255,255,0.08)',
+                            background: 'rgba(255,255,255,0.03)',
+                            marginBottom: '16px'
+                        }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '8px' }}>Summary</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                                <span>Dates</span>
+                                <span style={{ color: 'white' }}>{checkIn} → {checkOut} • {nights} nights</span>
+                            </div>
+                            {isGuestBooking ? (
+                                <>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '6px' }}>
+                                        <span>Total</span>
+                                        <span style={{ color: 'white' }}>{currency} {Number(totalPrice || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '6px' }}>
+                                        <span>Deposit</span>
+                                        <span style={{ color: 'white' }}>{currency} {Number(securityDeposit || 0).toLocaleString()}</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                                        {autoCleaning ? '✅ Auto‑cleaning enabled' : 'Auto‑cleaning off'}
+                                    </div>
+                                </>
+                            ) : (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginTop: '6px' }}>
+                                    <span>Repair expense</span>
+                                    <span style={{ color: 'white' }}>{currency} {Number(maintenanceExpense || 0).toLocaleString()}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {!isFormReady && (
+                            <div style={{ marginBottom: '12px', fontSize: '0.8rem', color: '#F59E0B' }}>
+                                Please fill required fields to continue.
+                            </div>
+                        )}
+
                         {/* Actions */}
                         <div style={{ display: 'flex', gap: '12px' }}>
                             <button
@@ -353,14 +400,15 @@ const BookingForm = ({ property, onAdd, onClose, initialData }) => {
                             </button>
                             <button
                                 type="submit"
+                                disabled={!isFormReady}
                                 style={{
                                     flex: 1,
                                     padding: '12px',
                                     borderRadius: '8px',
                                     border: 'none',
-                                    background: '#10B981',
-                                    color: 'white',
-                                    cursor: 'pointer',
+                                    background: isFormReady ? '#10B981' : 'rgba(255,255,255,0.08)',
+                                    color: isFormReady ? 'white' : 'var(--text-secondary)',
+                                    cursor: isFormReady ? 'pointer' : 'not-allowed',
                                     fontWeight: 600
                                 }}
                             >

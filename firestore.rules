@@ -65,12 +65,16 @@ service cloud.firestore {
       // PMC имеет полный доступ
       allow read, write: if isPMC();
       
-      // Владелец или создатель видит свои объекты (userId в базе - это владелец/создатель)
+      // Владелец или создатель видит свои объекты
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid);
       allow update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
-      // Арендатор видит объект, если он в нем прописан (через UID в tenantIds)
-      allow read: if isAuthenticated() && isTenantRole() && request.auth.uid in resource.data.tenantIds;
+      // Арендатор видит объект, если он в нем прописан (через UID) ИЛИ если он приглашен (через Email)
+      // Это решает проблему 403 при регистрации, когда UID еще не вставлен в tenantIds
+      allow read: if isAuthenticated() && (
+        (request.auth.uid in resource.data.tenantIds) ||
+        (request.auth.token.email in resource.data.tenantEmails)
+      );
 
       // Разрешаем создание
       allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || isPMC());
@@ -81,20 +85,21 @@ service cloud.firestore {
       allow read: if isAdmin() || isPMC() || isSelf(userId);
       allow create: if isSelf(userId)
         && (
-          // Владельцы и PMC создаются свободно
-          request.resource.data.role in ['owner', 'pmc'] || 
-          // Жильцы ОБЯЗАТЕЛЬНО должны предоставить inviteId, привязанный к их UID
+          // Владельцы создаются свободно
+          request.resource.data.role == 'owner' ||
+          // PMC и Tenant — ТОЛЬКО по инвайту, с проверкой роли инвайта
           (
-            request.resource.data.role == 'tenant' &&
+            request.resource.data.role in ['tenant', 'pmc'] &&
             request.resource.data.inviteId != null &&
             get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.status == 'used' &&
-            get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.usedBy == userId
+            get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.usedBy == userId &&
+            get(/databases/$(database)/documents/invitations/$(request.resource.data.inviteId)).data.role == request.resource.data.role
           )
         )
         && request.resource.data.role != 'admin'
         && request.resource.data.email == request.auth.token.email;
-      allow update: if isAdmin() || isPMC() || (isSelf(userId) && isSafeUserUpdate());
-      allow delete: if isAdmin() || isPMC();
+      allow update: if isAdmin() || (isSelf(userId) && isSafeUserUpdate());
+      allow delete: if isAdmin();
     }
     
     // Правила для коллекции вендоров
@@ -136,8 +141,13 @@ service cloud.firestore {
 
     // Правила для коллекции приглашений (invitations)
     match /invitations/{inviteId} {
-      // PMC и владельцы могут создавать и удалять
-      allow create, delete: if isPMC() || isOwnerRole();
+      // Создание/удаление инвайтов по роли
+      // - PMС инвайты: только Admin/Owner
+      // - Tenant инвайты: Owner/PMC/Admin
+      allow create, delete: if (
+        (request.resource.data.role == 'pmc' && (isAdmin() || isOwnerRole())) ||
+        (request.resource.data.role != 'pmc' && (isPMC() || isOwnerRole()))
+      );
       
       // Доступ только по точному ID (хешу токена). Листинг (list) полностью запрещен для всех.
       allow get: if isAuthenticated(); 
@@ -157,7 +167,9 @@ service cloud.firestore {
 
     // Правила для системных логов (Skynet Hub)
     match /system_logs/{logId} {
-      allow create: if isAuthenticated();
+      // Разрешаем создание логов ВСЕМ (в т.ч. анонимам при выходе), 
+      // чтобы Skynet мог фиксировать события auth.logout и ошибки до логина.
+      allow create: if true;
       allow read, update, delete: if isPMC();
     }
 

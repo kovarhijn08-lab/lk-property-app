@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 
-const SignUp = ({ onSignup, onSwitchToLogin, inviteToken, initialRole = 'owner' }) => {
+const SignUp = ({ onSignup, onSwitchToLogin, inviteToken, inviteRole = 'tenant' }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [role, setRole] = useState(inviteToken ? 'tenant' : initialRole);
+    const [role, setRole] = useState(inviteToken ? inviteRole : 'owner');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -73,9 +73,9 @@ const SignUp = ({ onSignup, onSwitchToLogin, inviteToken, initialRole = 'owner' 
                         background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary))',
                         WebkitBackgroundClip: 'text',
                         WebkitTextFillColor: 'transparent'
-                    }}>Create Account</h1>
+                    }}>Create your Araya Home account</h1>
                     <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        Start managing your real estate portfolio
+                        Property management in minutes.
                     </p>
                 </div>
 
@@ -158,37 +158,17 @@ const SignUp = ({ onSignup, onSwitchToLogin, inviteToken, initialRole = 'owner' 
                         </label>
                         {inviteToken ? (
                             <div style={{ padding: '12px', background: 'rgba(59, 130, 246, 0.1)', border: '1px solid rgba(59, 130, 246, 0.3)', borderRadius: '8px', color: '#60A5FA', fontSize: '0.9rem', fontWeight: 600 }}>
-                                🔗 Registering as Tenant (via Invite)
+                                {inviteRole === 'pmc' ? '🏢 Registering as PMC (via Invite)' : '🔗 Registering as Tenant (via Invite)'}
                             </div>
                         ) : (
-                            <>
-                                <div style={{ display: 'flex', gap: '10px' }}>
-                                    {['owner', 'pmc'].map(r => (
-                                        <button
-                                            key={r}
-                                            type="button"
-                                            onClick={() => setRole(r)}
-                                            style={{
-                                                flex: 1,
-                                                padding: '10px',
-                                                borderRadius: '8px',
-                                                border: role === r ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
-                                                background: role === r ? 'rgba(99, 102, 241, 0.1)' : 'rgba(255,255,255,0.03)',
-                                                color: role === r ? 'white' : 'var(--text-secondary)',
-                                                fontSize: '0.85rem',
-                                                fontWeight: 600,
-                                                cursor: 'pointer',
-                                                textTransform: 'uppercase'
-                                            }}
-                                        >
-                                            {r}
-                                        </button>
-                                    ))}
-                                </div>
-                                <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
-                                    ⚠️ Tenants: You cannot sign up independently. Please ask your manager for an invitation link.
-                                </p>
-                            </>
+                            <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', color: '#34D399', fontSize: '0.9rem', fontWeight: 600 }}>
+                                🏡 Registering as Owner (self‑signup)
+                            </div>
+                        )}
+                        {!inviteToken && (
+                            <p style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '8px', fontStyle: 'italic' }}>
+                                ⚠️ PMC accounts are created by invitation from Admin/Owner. Tenants cannot sign up independently.
+                            </p>
                         )}
                     </div>
 

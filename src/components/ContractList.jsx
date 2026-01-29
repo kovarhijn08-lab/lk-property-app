@@ -3,50 +3,93 @@ import LeaseTemplates from './LeaseTemplates';
 import SignatureCanvas from './SignatureCanvas';
 import EmptyState from './EmptyState';
 
-const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignContract }) => {
+const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignContract, currency = 'USD', propertyName }) => {
     const [showForm, setShowForm] = useState(false);
     const [showTemplates, setShowTemplates] = useState(false);
     const [showSignature, setShowSignature] = useState(false);
     const [contractToSign, setContractToSign] = useState(null);
+    const categoryOptions = ['Lease', 'Act', 'Invoice', 'Receipt', 'Other'];
     const [newContract, setNewContract] = useState({
+        category: 'Lease',
         tenantName: '',
+        title: '',
+        documentNumber: '',
         startDate: '',
         endDate: '',
         monthlyRent: '',
-        depositAmount: ''
+        depositAmount: '',
+        fileName: '',
+        fileSize: 0
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (!newContract.tenantName || !newContract.endDate) return;
+        const category = newContract.category || 'Lease';
+        const needsTenant = category === 'Lease';
+        const hasTenant = Boolean(newContract.tenantName?.trim());
+        const hasTitle = Boolean(newContract.title?.trim());
+        const hasFile = Boolean(newContract.fileName);
+        const hasEndDate = Boolean(newContract.endDate);
+
+        if (needsTenant && (!hasTenant || !hasEndDate)) return;
+        if (!needsTenant && !hasTitle && !hasFile) return;
 
         onAdd({
             id: Date.now().toString(),
             ...newContract,
             monthlyRent: parseFloat(newContract.monthlyRent) || 0,
             depositAmount: parseFloat(newContract.depositAmount) || 0,
-            status: 'active'
+            status: needsTenant ? 'active' : 'stored',
+            currency: newContract.currency || currency,
+            propertyName: newContract.propertyName || propertyName,
+            uploadedAt: new Date().toISOString()
         });
 
-        setNewContract({ tenantName: '', startDate: '', endDate: '', monthlyRent: '', depositAmount: '' });
+        setNewContract({
+            category: 'Lease',
+            tenantName: '',
+            title: '',
+            documentNumber: '',
+            startDate: '',
+            endDate: '',
+            monthlyRent: '',
+            depositAmount: '',
+            fileName: '',
+            fileSize: 0
+        });
         setShowForm(false);
     };
 
     const getExpiryStatus = (endDate) => {
+        if (!endDate) {
+            return { text: 'Stored', color: 'var(--text-secondary)' };
+        }
         const end = new Date(endDate);
         const now = new Date();
         const daysUntilExpiry = Math.ceil((end - now) / (1000 * 60 * 60 * 24));
 
+        if (Number.isNaN(daysUntilExpiry)) {
+            return { text: 'Stored', color: 'var(--text-secondary)' };
+        }
         if (daysUntilExpiry < 0) return { text: 'Expired', color: 'var(--accent-danger)' };
         if (daysUntilExpiry <= 30) return { text: `${daysUntilExpiry}d left`, color: 'var(--accent-warning)' };
         if (daysUntilExpiry <= 90) return { text: `${daysUntilExpiry}d left`, color: 'var(--accent-primary)' };
         return { text: `${daysUntilExpiry}d left`, color: 'var(--accent-success)' };
     };
 
+    const formatCurrency = (value, currencyCode = currency) => {
+        const amount = Number(value || 0);
+        try {
+            return new Intl.NumberFormat(undefined, { style: 'currency', currency: currencyCode }).format(amount);
+        } catch (e) {
+            return `${currencyCode} ${amount.toLocaleString()}`;
+        }
+    };
+
     return (
         <div className="glass-panel" style={{ padding: '16px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ margin: 0, fontSize: '1rem' }}>📄 Contracts & Leases</h3>
+                <h3 style={{ margin: 0, fontSize: '1rem' }}>📄 Documents & Contracts</h3>
                 <div style={{ display: 'flex', gap: '8px' }}>
                     <button
                         onClick={() => setShowTemplates(true)}
@@ -98,12 +141,49 @@ const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignCo
             {/* Add Contract Form */}
             {showForm && (
                 <form onSubmit={handleSubmit} style={{ marginBottom: '16px', padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+                        {categoryOptions.map(option => (
+                            <button
+                                key={option}
+                                type="button"
+                                onClick={() => setNewContract({ ...newContract, category: option })}
+                                style={{
+                                    padding: '6px 12px',
+                                    borderRadius: '999px',
+                                    border: newContract.category === option ? '1px solid var(--accent-primary)' : '1px solid var(--glass-border)',
+                                    background: newContract.category === option ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255,255,255,0.02)',
+                                    color: newContract.category === option ? 'white' : 'var(--text-secondary)',
+                                    fontSize: '0.7rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
                     <div style={{ marginBottom: '12px' }}>
                         <input
                             type="text"
-                            placeholder="Tenant Name"
-                            value={newContract.tenantName}
-                            onChange={(e) => setNewContract({ ...newContract, tenantName: e.target.value })}
+                            placeholder={newContract.category === 'Lease' ? 'Tenant Name *' : 'Document Title *'}
+                            value={newContract.category === 'Lease' ? newContract.tenantName : newContract.title}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setNewContract({
+                                    ...newContract,
+                                    tenantName: newContract.category === 'Lease' ? value : newContract.tenantName,
+                                    title: newContract.category === 'Lease' ? newContract.title : value
+                                });
+                            }}
+                            style={{ width: '100%', padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                        />
+                    </div>
+                    <div style={{ marginBottom: '12px' }}>
+                        <input
+                            type="text"
+                            placeholder="Document Number (optional)"
+                            value={newContract.documentNumber}
+                            onChange={(e) => setNewContract({ ...newContract, documentNumber: e.target.value })}
                             style={{ width: '100%', padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
                         />
                     </div>
@@ -117,30 +197,53 @@ const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignCo
                         />
                         <input
                             type="date"
-                            placeholder="End Date"
+                            placeholder={newContract.category === 'Lease' ? 'End Date *' : 'End Date'}
                             value={newContract.endDate}
                             onChange={(e) => setNewContract({ ...newContract, endDate: e.target.value })}
                             style={{ padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
                         />
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                    {newContract.category === 'Lease' && (
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+                            <input
+                                type="number"
+                                placeholder="Monthly Rent"
+                                value={newContract.monthlyRent}
+                                onChange={(e) => setNewContract({ ...newContract, monthlyRent: e.target.value })}
+                                style={{ padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                            />
+                            <input
+                                type="number"
+                                placeholder="Deposit"
+                                value={newContract.depositAmount}
+                                onChange={(e) => setNewContract({ ...newContract, depositAmount: e.target.value })}
+                                style={{ padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                            />
+                        </div>
+                    )}
+                    <div style={{ marginBottom: '12px' }}>
+                        <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '6px' }}>Attach file (optional)</label>
                         <input
-                            type="number"
-                            placeholder="Monthly Rent"
-                            value={newContract.monthlyRent}
-                            onChange={(e) => setNewContract({ ...newContract, monthlyRent: e.target.value })}
-                            style={{ padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
+                            type="file"
+                            onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setNewContract({
+                                    ...newContract,
+                                    fileName: file.name,
+                                    fileSize: file.size
+                                });
+                            }}
+                            style={{ width: '100%', color: 'var(--text-secondary)' }}
                         />
-                        <input
-                            type="number"
-                            placeholder="Deposit"
-                            value={newContract.depositAmount}
-                            onChange={(e) => setNewContract({ ...newContract, depositAmount: e.target.value })}
-                            style={{ padding: '10px', background: 'var(--bg-secondary)', border: 'var(--glass-border)', borderRadius: '6px', color: 'var(--text-primary)' }}
-                        />
+                        {newContract.fileName && (
+                            <div style={{ marginTop: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                📎 {newContract.fileName}
+                            </div>
+                        )}
                     </div>
                     <button type="submit" style={{ width: '100%', padding: '10px', background: 'var(--accent-success)', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}>
-                        Save Contract
+                        {newContract.category === 'Lease' ? 'Save Contract' : 'Save Document'}
                     </button>
                 </form>
             )}
@@ -149,8 +252,8 @@ const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignCo
             {contracts.length === 0 ? (
                 <EmptyState
                     icon="📄"
-                    title="No active contracts"
-                    description="Upload your lease agreements or use our templates to generate a professional contract."
+                    title="No documents yet"
+                    description="Upload your legal documents or use our templates to generate a professional lease."
                     actionLabel="Generate Lease"
                     onAction={() => setShowTemplates(true)}
                     variant="glass"
@@ -159,6 +262,17 @@ const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignCo
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {contracts.map(contract => {
                         const expiry = getExpiryStatus(contract.endDate);
+                        const category = contract.category || 'Lease';
+                        const isLease = category === 'Lease';
+                        const displayTitle = contract.title || contract.tenantName || 'Document';
+                        const metaDetails = [
+                            contract.propertyName || propertyName || 'Property',
+                            category
+                        ];
+                        const dateLabel = contract.startDate && contract.endDate
+                            ? `${contract.startDate} — ${contract.endDate}`
+                            : contract.endDate || contract.startDate || contract.uploadedAt?.slice(0, 10);
+                        if (dateLabel) metaDetails.push(dateLabel);
                         return (
                             <div key={contract.id} className="glass-panel" style={{
                                 display: 'flex',
@@ -178,15 +292,37 @@ const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignCo
                                         boxShadow: `0 0 10px ${expiry.color}40`
                                     }}></div>
                                     <div>
-                                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{contract.tenantName}</div>
-                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                                            {contract.propertyName || 'Property'} • {contract.startDate} — {contract.endDate}
+                                        <div style={{ fontWeight: 700, fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            {displayTitle}
+                                            <span style={{
+                                                padding: '2px 8px',
+                                                borderRadius: '999px',
+                                                fontSize: '0.65rem',
+                                                fontWeight: 800,
+                                                background: 'rgba(99, 102, 241, 0.15)',
+                                                color: 'var(--accent-primary)',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                {category}
+                                            </span>
                                         </div>
+                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                            {metaDetails.join(' • ')}
+                                        </div>
+                                        {!isLease && (contract.fileName || contract.documentNumber) && (
+                                            <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                                                {contract.fileName ? `File: ${contract.fileName}` : `Doc #: ${contract.documentNumber}`}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                                     <div style={{ textAlign: 'right', marginRight: '8px' }}>
-                                        <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>${contract.monthlyRent?.toLocaleString()}</div>
+                                        {isLease && (
+                                            <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>
+                                                {formatCurrency(contract.monthlyRent, contract.currency)}
+                                            </div>
+                                        )}
                                         <span style={{
                                             padding: '2px 8px',
                                             borderRadius: '8px',
@@ -199,7 +335,7 @@ const ContractList = ({ contracts = [], onAdd, onDelete, onScanRequest, onSignCo
                                             {expiry.text}
                                         </span>
                                     </div>
-                                    {contract.status !== 'signed' && (
+                                    {isLease && contract.status !== 'signed' && (
                                         <button
                                             onClick={() => {
                                                 setContractToSign(contract);

@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+import { getAuth, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator } from 'firebase/storage';
 import { getAnalytics } from 'firebase/analytics';
 
 // Your web app's Firebase configuration
@@ -40,5 +40,19 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const analytics = getAnalytics(app);
+
+// Optional local emulator support
+const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
+if (useEmulators) {
+    const emulatorHost = import.meta.env.VITE_FIREBASE_EMULATOR_HOST || 'localhost';
+    const firestorePort = Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080);
+    const authPort = Number(import.meta.env.VITE_AUTH_EMULATOR_PORT || 9099);
+    const storagePort = Number(import.meta.env.VITE_STORAGE_EMULATOR_PORT || 9199);
+
+    connectFirestoreEmulator(db, emulatorHost, firestorePort);
+    connectAuthEmulator(auth, `http://${emulatorHost}:${authPort}`);
+    connectStorageEmulator(storage, emulatorHost, storagePort);
+    console.log('Firebase emulators enabled', { emulatorHost, firestorePort, authPort, storagePort });
+}
 
 export default app;

@@ -112,6 +112,8 @@ function App() {
   const [prefilledTransactionData, setPrefilledTransactionData] = useState(null);
   const [activeSupportUserId, setActiveSupportUserId] = useState(null);
   const [showSupportView, setShowSupportView] = useState(false);
+  const [showAssistantWidget, setShowAssistantWidget] = useState(false);
+  const [autoOpenBookingForm, setAutoOpenBookingForm] = useState(false);
   const [safeMode, setSafeMode] = useState(false);
   const [loadFailures, setLoadFailures] = useState(() => {
     const saved = sessionStorage.getItem('pocketLedger_load_failures');
@@ -122,6 +124,44 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const { performSearch } = useSearch(properties, currentUser);
   const searchResults = performSearch(searchQuery);
+
+  const handleOpenAssistant = () => {
+    if (isMobile) {
+      setActiveSupportUserId(null);
+      setActiveMobileView('chats');
+      setShowSupportView(true);
+      return;
+    }
+    setShowAssistantWidget(true);
+  };
+
+  const handleOpenPropertyTab = (tab = 'overview') => {
+    const targetId = selectedPropertyId !== 'all' ? selectedPropertyId : properties[0]?.id;
+    if (!targetId) return;
+    setSelectedPropertyId(targetId);
+    setDetailInitialTab(tab);
+    setShowPropertyDetail(true);
+  };
+
+  const handleOpenBookingFlow = () => {
+    const strProperty = properties.find(p => p.type === 'str') || properties[0];
+    if (!strProperty) return;
+    setSelectedPropertyId(strProperty.id);
+    setDetailInitialTab('tenant');
+    if (strProperty.type === 'str') {
+      setAutoOpenBookingForm(true);
+    } else {
+      setShowCalendar(true);
+    }
+    setShowPropertyDetail(true);
+  };
+
+  const handleOpenChats = () => {
+    setActiveSupportUserId(null);
+    setShowSupportView(false);
+    setActiveMobileView('chats');
+    setSelectedPropertyId('all');
+  };
 
   // Sync states to localStorage (for MVP persistence as requested in roadmap/directives)
   useEffect(() => {
@@ -321,12 +361,24 @@ function App() {
 
   // Show login/signup if not authenticated
   if (!isAuthenticated) {
+    const pathname = window.location.pathname || '/';
+    const isTenantPath = pathname.startsWith('/tenant');
+    const isAppPath = pathname.startsWith('/app');
     const urlParams = new URLSearchParams(window.location.search);
     const inviteToken = urlParams.get('invite');
+    const roleParam = urlParams.get('role');
+    const inviteRole = ['tenant', 'pmc'].includes(roleParam) ? roleParam : 'tenant';
 
     // Если есть инвайт - сразу на регистрацию жильца
     if (inviteToken && authView === 'hub') {
+      setTargetRole(inviteRole);
       setAuthView('signup');
+    }
+
+    // Route-based entry points
+    if (!inviteToken && (isTenantPath || isAppPath) && authView === 'hub') {
+      setTargetRole(isTenantPath ? 'tenant' : 'owner');
+      setAuthView('login');
     }
 
     if (authView === 'hub') {
@@ -334,9 +386,11 @@ function App() {
         <LoginHub
           onSelectPath={(path) => {
             if (path === 'business') {
+              window.history.pushState({}, '', '/app');
               setAuthView('login');
               setTargetRole('owner');
             } else {
+              window.history.pushState({}, '', '/tenant');
               setAuthView('login');
               setTargetRole('tenant');
             }
@@ -351,7 +405,7 @@ function App() {
           onSignup={signup}
           onSwitchToLogin={() => setAuthView('login')}
           inviteToken={inviteToken}
-          initialRole={targetRole || 'owner'}
+          inviteRole={inviteRole}
         />
       );
     }
@@ -361,6 +415,7 @@ function App() {
         onLogin={login}
         onForgotPassword={sendPasswordReset}
         onSwitchToSignup={() => setAuthView('signup')}
+        hideSignup={isTenantPath && !inviteToken}
       />
     );
   }
@@ -386,6 +441,14 @@ function App() {
     } else {
       setToast({ message: `Ошибка создания: ${response.error}`, type: 'error' });
     }
+  };
+
+  const handleAddProperty = async (newProp) => {
+    if (!newProp) {
+      setShowAddPropertyForm(true);
+      return;
+    }
+    await addProperty(newProp);
   };
 
   const addTransaction = async (tx) => {
@@ -582,7 +645,10 @@ function App() {
     const newContract = {
       id: Date.now().toString(),
       ...data,
-      depositAmount: data.deposit || 0
+      depositAmount: data.deposit || 0,
+      category: data.category || 'Lease',
+      currency: data.currency || selectedProperty.currency || 'USD',
+      propertyName: data.propertyName || selectedProperty.name
     };
     await addContract(newContract);
     setShowLeaseScanner(false);
@@ -657,8 +723,8 @@ function App() {
 
   // Dynamic View Rendering
   const renderPropertyView = () => {
-    // Global Mobile Views (Priority)
-    if (isMobile && activeMobileView === 'notifications') {
+    // Global Views (Priority)
+    if (activeMobileView === 'notifications' && isMobile) {
       return <MobileSmartTasks
         properties={properties}
         manualTasks={manualTasks}
@@ -668,7 +734,7 @@ function App() {
         history={taskHistory}
       />;
     }
-    if (isMobile && activeMobileView === 'chats') {
+    if (activeMobileView === 'chats') {
       if (showSupportView) {
         return (
           <div style={{ padding: '8px', paddingBottom: '90px', height: '100%' }}>
@@ -694,7 +760,7 @@ function App() {
         }}
       />;
     }
-    if (isMobile && activeMobileView === 'agenda') {
+    if (activeMobileView === 'agenda' && isMobile) {
       return <MobileAgenda properties={properties} />;
     }
 
@@ -731,19 +797,37 @@ function App() {
         return <TenantArea properties={properties} />;
       }
       if (currentUser?.role === 'owner') {
-        return <OwnerPortal properties={properties} />;
+        return (
+          <OwnerPortal
+            properties={properties}
+            onAddProperty={handleAddProperty}
+            onOpenProperty={(id) => {
+              if (!id) return;
+              setSelectedPropertyId(id);
+              setShowPropertyDetail(true);
+            }}
+            onOpenLegal={() => setActiveMobileView('legal')}
+            onOpenAssistant={handleOpenAssistant}
+          />
+        );
       }
 
-      return <GlobalDashboard
-        properties={properties}
-        onPropertyClick={(id) => { setSelectedPropertyId(id); }}
-        onViewReports={() => setActiveMobileView('reports')}
-        onUpdateProperty={updateProperty}
-        onAddProperty={addProperty}
-        warningPeriod={settings.warningPeriod}
-        onOpenDrawer={() => setIsDrawerOpen(true)}
-        user={currentUser}
-      />;
+        return <GlobalDashboard
+          properties={properties}
+          onPropertyClick={(id) => { setSelectedPropertyId(id); }}
+          onViewReports={() => setActiveMobileView('reports')}
+          onUpdateProperty={updateProperty}
+          onAddProperty={handleAddProperty}
+          warningPeriod={settings.warningPeriod}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+          onOpenAssistant={handleOpenAssistant}
+          onOpenCalendar={() => setShowCalendar(true)}
+          onOpenLegalHub={() => setActiveMobileView('legal')}
+          onOpenPropertyTab={handleOpenPropertyTab}
+          onOpenBookingFlow={handleOpenBookingFlow}
+          onOpenChats={handleOpenChats}
+          user={currentUser}
+        />;
     }
 
     if (!selectedProperty) return <p>Property not found.</p>;
@@ -894,6 +978,8 @@ function App() {
         <section>
           <ContractList
             contracts={selectedProperty.contracts || []}
+            currency={selectedProperty.currency}
+            propertyName={selectedProperty.name}
             onAdd={addContract}
             onDelete={deleteContract}
             onScanRequest={() => setShowLeaseScanner(true)}
@@ -984,6 +1070,7 @@ function App() {
             onOpenSettings={() => setShowSettings(true)}
             onAddProperty={() => setShowAddPropertyForm(true)}
             onOpenCalendar={() => setShowCalendar(true)}
+            onOpenChats={handleOpenChats}
             user={currentUser}
             onLogout={logout}
           />
@@ -1071,6 +1158,10 @@ function App() {
           {/* Removed NotificationPanel from here - now in NotificationDrawer */}
           {renderPropertyView()}
 
+          {showAssistantWidget && (
+            <SupportChat onClose={() => setShowAssistantWidget(false)} />
+          )}
+
           {/* Modals */}
           {showScanner && (
             <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
@@ -1111,9 +1202,11 @@ function App() {
               onClose={() => {
                 setShowPropertyDetail(false);
                 setDetailInitialTab('overview');
+                setAutoOpenBookingForm(false);
               }}
               vendors={vendors}
               initialTab={detailInitialTab}
+              autoOpenBookingForm={autoOpenBookingForm}
               onAddVendor={addVendor}
               onDeleteVendor={deleteVendor}
             />

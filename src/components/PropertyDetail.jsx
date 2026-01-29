@@ -17,8 +17,9 @@ import InviteManager from './InviteManager';
 import TagInput from './TagInput'; // [NEW]
 import { getTagColor } from '../utils/tagUtils'; // [NEW]
 import { EditIcon, TrashIcon, InfoIcon } from './Icons';
+import { useAuth } from '../context/AuthContext';
 
-const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors, onAddVendor, onDeleteVendor, initialTab = 'overview' }) => {
+const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors, onAddVendor, onDeleteVendor, initialTab = 'overview', autoOpenBookingForm = false }) => {
     const { t } = useLanguage();
     const [isEditing, setIsEditing] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -29,7 +30,20 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
     const [bookingToDelete, setBookingToDelete] = useState(null);
     const [activeTab, setActiveTab] = useState(initialTab);
     const [showInviteModal, setShowInviteModal] = useState(false);
+    const [showPmcInviteModal, setShowPmcInviteModal] = useState(false);
     const [selectedUnitId, setSelectedUnitId] = useState(null);
+    const { currentUser } = useAuth();
+    const canInvitePMC = currentUser?.role === 'owner' || currentUser?.role === 'admin';
+
+    const formatCurrency = (value) => {
+        const currency = property?.currency || 'USD';
+        const amount = Number(value || 0);
+        try {
+            return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amount);
+        } catch (e) {
+            return `${currency} ${amount.toLocaleString()}`;
+        }
+    };
 
     // Edit Form State
     const [editedProp, setEditedProp] = useState({ ...property });
@@ -53,6 +67,12 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
             setErrors(currentErrors);
         }
     }, [editedProp, isEditing]);
+
+    useEffect(() => {
+        if (autoOpenBookingForm && property?.type === 'str') {
+            setShowBookingForm(true);
+        }
+    }, [autoOpenBookingForm, property?.type]);
 
     const handleSave = async () => {
         if (Object.keys(errors).length > 0) return;
@@ -478,11 +498,11 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                                                 <div className="glass-panel" style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', borderTop: '2px solid rgba(255,255,255,0.1)' }}>
                                                     <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>{t('property.purchasePrice')}</div>
-                                                    <div style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'var(--font-display)' }}>${property.purchasePrice?.toLocaleString()}</div>
+                                                    <div style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'var(--font-display)' }}>{formatCurrency(property.purchasePrice)}</div>
                                                 </div>
                                                 <div className="glass-panel" style={{ padding: '24px', background: 'rgba(255,255,255,0.02)', borderTop: '2px solid var(--accent-success)' }}>
                                                     <div style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>{t('property.marketValue')}</div>
-                                                    <div style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'var(--font-display)', color: 'var(--accent-success)' }}>${property.marketValue?.toLocaleString()}</div>
+                                                    <div style={{ fontSize: '1.4rem', fontWeight: 900, fontFamily: 'var(--font-display)', color: 'var(--accent-success)' }}>{formatCurrency(property.marketValue)}</div>
                                                 </div>
                                             </div>
 
@@ -500,6 +520,34 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                                     >
                                                         + Invite
                                                     </button>
+                                                </div>
+                                            )}
+
+                                            {canInvitePMC && (
+                                                <div className="glass-panel" style={{ padding: '20px', border: '1px dashed var(--glass-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <div>
+                                                        <div style={{ fontWeight: 800, fontSize: '0.9rem' }}>Invite PMC</div>
+                                                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Assign a property manager to this property</div>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => { setShowPmcInviteModal(!showPmcInviteModal); }}
+                                                        className="btn-secondary"
+                                                        style={{ padding: '8px 16px', borderRadius: '8px', fontSize: '0.75rem' }}
+                                                    >
+                                                        {showPmcInviteModal ? t('common.cancel') : '+ Invite'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {showPmcInviteModal && canInvitePMC && (
+                                                <div style={{ marginTop: '12px' }}>
+                                                    <InviteManager
+                                                        propertyId={property.id}
+                                                        inviteRole="pmc"
+                                                        onInviteSent={() => {
+                                                            // Optional: refresh or close
+                                                        }}
+                                                    />
                                                 </div>
                                             )}
 
@@ -642,6 +690,8 @@ const PropertyDetail = ({ property, onUpdate, onDelete, onSell, onClose, vendors
                                         <>
                                             <ContractList
                                                 contracts={property.contracts || []}
+                                                currency={property.currency}
+                                                propertyName={property.name}
                                                 onAdd={(newContract) => {
                                                     const updatedContracts = [...(property.contracts || []), newContract];
                                                     onUpdate(property.id, { ...property, contracts: updatedContracts });
