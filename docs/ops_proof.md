@@ -29,13 +29,14 @@
    3) Сделайте скриншот с датой.
 
 ## D) Backup Infra Proof (GCS + Scheduler)
-- Cloud Scheduler job name: `firestore-weekly-backup`
+- Cloud Scheduler job name: `firestore-weekly-backup-pubsub`
+- Target: Pub/Sub topic `firestore-weekly-backup`
 - Schedule (cron): `0 0 * * 0` (Weekly)
-- Last run status: ☐ success ☐ failed (Needs verification after IAM update)
+- Last run status: ☑ success ☐ failed (Force run successful on 2026-01-30, ~21:17 GMT+7)
 - Screenshot attached: ☐
- - TODO: Add scheduler status screenshot
+ - TODO: Add scheduler status screenshot (success)
  - How to verify:
-   1) GCP → Cloud Scheduler → job `firestore-weekly-backup`.
+   1) GCP → Cloud Scheduler → job `firestore-weekly-backup-pubsub`.
    2) Откройте job → статус последнего запуска.
    3) Сделайте скриншот со статусом.
 
@@ -43,9 +44,10 @@
 - Latest export folder/date: 
 - Screenshot attached: ☐
  - TODO: Add bucket export screenshot + latest folder/date
+ - Notes: bucket list access for user pending (storage.objects.list).
  - How to verify:
    1) GCP → Cloud Storage → bucket `lk-property-backups-2026`.
-   2) Откройте последнюю папку экспорта (дата).
+   2) Откройте папку `exports/` и последнюю подпапку (дата).
    3) Сделайте скриншот списка объектов.
 
 ## Notes
