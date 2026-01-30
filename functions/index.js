@@ -134,8 +134,30 @@ exports.skynetCleanup = functions.pubsub.schedule('every 24 hours').onRun(async 
     console.log(`[Skynet] Cleanup completed. Removed ${oldLogs.size} old logs.`);
 });
 
+async function runFirestoreExport() {
+    const { FirestoreAdminClient } = require('@google-cloud/firestore').v1;
+    const client = new FirestoreAdminClient();
+    const projectId = process.env.GCLOUD_PROJECT || admin.app().options.projectId;
+    const bucket = 'lk-property-backups-2026';
+
+    if (!projectId) {
+        throw new Error('Missing project id');
+    }
+
+    const databaseName = client.databasePath(projectId, '(default)');
+    const outputUriPrefix = `gs://${bucket}/exports/${new Date().toISOString()}`;
+
+    const [operation] = await client.exportDocuments({
+        name: databaseName,
+        outputUriPrefix
+    });
+    const [response] = await operation.promise();
+    console.log('[Backup] Export finished', response);
+    return { outputUriPrefix, name: response?.name || null };
+}
+
 /**
- * Firestore export backup (HTTP trigger for Cloud Scheduler)
+ * Firestore export backup (HTTP trigger for legacy Scheduler)
  */
 exports.firestoreWeeklyBackup = functions
     .region('asia-southeast1')
@@ -144,35 +166,26 @@ exports.firestoreWeeklyBackup = functions
             res.status(405).send('Method Not Allowed');
             return;
         }
-
-        const { FirestoreAdminClient } = require('@google-cloud/firestore').v1;
-        const client = new FirestoreAdminClient();
-        const projectId = process.env.GCLOUD_PROJECT || admin.app().options.projectId;
-        const bucket = 'lk-property-backups-2026';
-
-        if (!projectId) {
-            res.status(500).send('Missing project id');
-            return;
-        }
-
-        const databaseName = client.databasePath(projectId, '(default)');
-        const outputUriPrefix = `gs://${bucket}/exports/${new Date().toISOString()}`;
-
         try {
-            const [operation] = await client.exportDocuments({
-                name: databaseName,
-                outputUriPrefix
-            });
-            const [response] = await operation.promise();
-
-            console.log('[Backup] Export finished', response);
-            res.status(200).json({
-                ok: true,
-                outputUriPrefix,
-                name: response?.name || null
-            });
+            const result = await runFirestoreExport();
+            res.status(200).json({ ok: true, ...result });
         } catch (error) {
             console.error('[Backup] Export failed', error);
             res.status(500).json({ ok: false, error: error.message || String(error) });
         }
     });
+
+/**
+ * Firestore export backup (Pub/Sub trigger for Cloud Scheduler)
+ */
+const { onMessagePublished } = require('firebase-functions/v2/pubsub');
+exports.firestoreWeeklyBackupPubsub = onMessagePublished(
+    {
+        topic: 'firestore-weekly-backup',
+        region: 'asia-southeast1',
+        serviceAccount: 'smart-pocket-ledger@appspot.gserviceaccount.com'
+    },
+    async () => {
+        await runFirestoreExport();
+    }
+);
