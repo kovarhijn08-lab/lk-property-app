@@ -133,3 +133,46 @@ exports.skynetCleanup = functions.pubsub.schedule('every 24 hours').onRun(async 
     await batch.commit();
     console.log(`[Skynet] Cleanup completed. Removed ${oldLogs.size} old logs.`);
 });
+
+/**
+ * Firestore export backup (HTTP trigger for Cloud Scheduler)
+ */
+exports.firestoreWeeklyBackup = functions
+    .region('asia-southeast1')
+    .https.onRequest(async (req, res) => {
+        if (req.method !== 'POST') {
+            res.status(405).send('Method Not Allowed');
+            return;
+        }
+
+        const { FirestoreAdminClient } = require('@google-cloud/firestore').v1;
+        const client = new FirestoreAdminClient();
+        const projectId = process.env.GCLOUD_PROJECT || admin.app().options.projectId;
+        const bucket = 'lk-property-backups-2026';
+
+        if (!projectId) {
+            res.status(500).send('Missing project id');
+            return;
+        }
+
+        const databaseName = client.databasePath(projectId, '(default)');
+        const outputUriPrefix = `gs://${bucket}/exports/${new Date().toISOString()}`;
+
+        try {
+            const [operation] = await client.exportDocuments({
+                name: databaseName,
+                outputUriPrefix
+            });
+            const [response] = await operation.promise();
+
+            console.log('[Backup] Export finished', response);
+            res.status(200).json({
+                ok: true,
+                outputUriPrefix,
+                name: response?.name || null
+            });
+        } catch (error) {
+            console.error('[Backup] Export failed', error);
+            res.status(500).json({ ok: false, error: error.message || String(error) });
+        }
+    });
