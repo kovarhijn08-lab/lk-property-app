@@ -313,6 +313,7 @@ export const translations = {
             phoneExample: 'e.g., +1 555 0123',
             emailInvalid: 'Invalid email address',
             emailExample: 'e.g., name@example.com',
+            fixErrors: 'Fix the errors above',
             diagnostics: 'Diagnostics'
         },
         safeMode: {
