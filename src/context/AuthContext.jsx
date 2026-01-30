@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
 
             if (user) {
                 // Real-time listener for user document (role changes, etc)
-                unsubscribeDoc = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+                unsubscribeDoc = onSnapshot(doc(db, 'users', user.uid), async (snapshot) => {
                     if (snapshot.exists()) {
                         const userData = snapshot.data();
                         console.log(`[Auth] User document updated for ${user.email} (Role: ${userData.role})`);
