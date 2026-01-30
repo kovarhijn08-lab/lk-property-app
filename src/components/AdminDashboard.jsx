@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { firestoreOperations } from '../hooks/useFirestore';
-import { collection, getDocs, query, orderBy, limit, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, orderBy, limit, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { validateForm } from '../utils/validators';
 import { runGlobalDiagnostics, autoFixProperty, runUserDiagnostics } from '../utils/DiagnosticsManager';
@@ -40,6 +40,9 @@ const AdminDashboard = ({ onClose }) => {
         properties: []
     });
     const [maintenanceRequests, setMaintenanceRequests] = useState([]);
+    const [logsLoading, setLogsLoading] = useState(false);
+    const [usersLoading, setUsersLoading] = useState(false);
+    const [maintenanceLoading, setMaintenanceLoading] = useState(false);
     const [allTransactions, setAllTransactions] = useState([]);
     const [backupsInfo, setBackupsInfo] = useState({
         lastBackup: '2026-01-20',
@@ -155,21 +158,43 @@ const AdminDashboard = ({ onClose }) => {
     };
 
 
-    // Real-time Skynet Observation (Logs & Activity)
+    const loadLogs = async () => {
+        if (!isAdmin) return;
+        setLogsLoading(true);
+        const response = await firestoreOperations.getCollection('system_logs', [orderBy('timestamp', 'desc'), limit(50)]);
+        if (response.success) {
+            setPersistentLogs(response.data || []);
+        }
+        setLogsLoading(false);
+    };
 
-    // Real-time Skynet Observation (Logs & Activity)
+    const loadUsers = async () => {
+        if (!isAdmin) return;
+        setUsersLoading(true);
+        const response = await firestoreOperations.getCollection('users', [orderBy('createdAt', 'desc'), limit(100)]);
+        if (response.success) {
+            setUsers(response.data || []);
+        }
+        setUsersLoading(false);
+    };
+
+    const loadMaintenance = async () => {
+        if (!isAdmin) return;
+        setMaintenanceLoading(true);
+        const response = await firestoreOperations.getCollection('maintenance_requests', [orderBy('createdAt', 'desc'), limit(50)]);
+        if (response.success) {
+            setMaintenanceRequests(response.data || []);
+        }
+        setMaintenanceLoading(false);
+    };
+
+    // One-time loads to reduce real-time read pressure
     useEffect(() => {
         if (!isAdmin) return;
-
-        const logsRef = collection(db, 'system_logs');
-        const logsQuery = query(logsRef, orderBy('timestamp', 'desc'), limit(50));
-
-        const unsubscribeLogs = onSnapshot(logsQuery, (snapshot) => {
-            const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setPersistentLogs(items);
-        });
-
-        return () => unsubscribeLogs();
+        loadLogs();
+        loadUsers();
+        loadMaintenance();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isAdmin]);
 
     const runDiagnostics = async () => {
@@ -376,35 +401,7 @@ const AdminDashboard = ({ onClose }) => {
         }
     };
 
-    // Real-time Users Observation
-    useEffect(() => {
-        if (!isAdmin) return;
-
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, orderBy('createdAt', 'desc'), limit(100));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const userList = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setUsers(userList);
-        });
-
-        return () => unsubscribe();
-    }, [isAdmin]);
-
-    // Real-time Maintenance Requests Observation (v2)
-    useEffect(() => {
-        if (!isAdmin) return;
-
-        const maintenanceRef = collection(db, 'maintenance_requests');
-        const q = query(maintenanceRef, orderBy('createdAt', 'desc'), limit(50));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setMaintenanceRequests(list);
-        });
-
-        return () => unsubscribe();
-    }, [isAdmin]);
+    // Real-time Users/Maintenance subscriptions disabled to avoid quota pressure
 
     // Aggregate Transactions from all properties (v2)
     useEffect(() => {
@@ -575,6 +572,13 @@ const AdminDashboard = ({ onClose }) => {
                                     placeholder={t('admin.logs.searchPlaceholder')}
                                     style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', minWidth: '240px' }}
                                 />
+                                <button
+                                    onClick={loadLogs}
+                                    disabled={logsLoading}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', opacity: logsLoading ? 0.6 : 1 }}
+                                >
+                                    {logsLoading ? '...' : t('common.refresh')}
+                                </button>
                                 <button
                                     onClick={() => downloadJson('incidents.json', incidentLogs)}
                                     style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
@@ -787,12 +791,21 @@ const AdminDashboard = ({ onClose }) => {
                                     {filteredUsers.length}/{users.length}
                                 </span>
                             </div>
-                            <button
-                                onClick={() => downloadJson('users.json', filteredUsers)}
-                                style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
-                            >
-                                {t('admin.users.export')}
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    onClick={loadUsers}
+                                    disabled={usersLoading}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', opacity: usersLoading ? 0.6 : 1 }}
+                                >
+                                    {usersLoading ? '...' : t('common.refresh')}
+                                </button>
+                                <button
+                                    onClick={() => downloadJson('users.json', filteredUsers)}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                                >
+                                    {t('admin.users.export')}
+                                </button>
+                            </div>
                         </div>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
                             <thead style={{ background: '#222' }}>
@@ -1170,6 +1183,16 @@ const AdminDashboard = ({ onClose }) => {
 
                 {activeTab === 'maintenance' && (
                     <div className="tab-content">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.1rem' }}>{t('admin.tabs.maintenance')}</h2>
+                            <button
+                                onClick={loadMaintenance}
+                                disabled={maintenanceLoading}
+                                style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', opacity: maintenanceLoading ? 0.6 : 1 }}
+                            >
+                                {maintenanceLoading ? '...' : t('common.refresh')}
+                            </button>
+                        </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '32px' }}>
                             <div style={{ padding: '20px', background: '#111', border: '1px solid #333', borderRadius: '12px', textAlign: 'center' }}>
                                 <div style={{ color: '#888', fontSize: '0.7rem' }}>{t('admin.maintenance.totalRequests')}</div>
@@ -1318,12 +1341,21 @@ const AdminDashboard = ({ onClose }) => {
                                 </div>
                                 <div style={{ fontSize: '0.75rem', color: '#555' }}>{t('admin.audit.checksum')}</div>
                             </div>
-                            <button
-                                onClick={() => downloadJson('logs.json', filteredLogs)}
-                                style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
-                            >
-                                {t('admin.logs.export')}
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    onClick={loadLogs}
+                                    disabled={logsLoading}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', opacity: logsLoading ? 0.6 : 1 }}
+                                >
+                                    {logsLoading ? '...' : t('common.refresh')}
+                                </button>
+                                <button
+                                    onClick={() => downloadJson('logs.json', filteredLogs)}
+                                    style={{ background: '#222', border: '1px solid #444', color: 'white', padding: '8px 12px', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer' }}
+                                >
+                                    {t('admin.logs.export')}
+                                </button>
+                            </div>
                         </div>
 
                         <div style={{ marginBottom: '20px', display: 'flex', gap: '12px' }}>

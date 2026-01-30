@@ -21,7 +21,8 @@ export const translations = {
             taxDocs: 'Tax Documents',
             saveGoal: 'Goal Saved',
             tags: 'Tags',
-            optional: 'Optional'
+            optional: 'Optional',
+            refresh: 'Refresh'
         },
         filters: {
             title: 'Filters',
@@ -528,7 +529,8 @@ export const translations = {
             taxDocs: 'Налоговые Документы',
             saveGoal: 'Цель сохранена',
             tags: 'Метки',
-            optional: 'Необязательно'
+            optional: 'Необязательно',
+            refresh: 'Обновить'
         },
         filters: {
             title: 'Фильтры',

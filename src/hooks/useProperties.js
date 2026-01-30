@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useFirestoreCollection, firestoreOperations } from './useFirestore';
+import { useMemo, useState, useEffect } from 'react';
+import { firestoreOperations } from './useFirestore';
 import { where, or, orderBy } from 'firebase/firestore';
 import { skynet } from '../utils/SkynetLogger';
 
@@ -13,6 +13,9 @@ import { skynet } from '../utils/SkynetLogger';
 export const useProperties = (user) => {
     const userId = user?.id;
     const role = user?.role;
+    const [properties, setProperties] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     // Мемоизируем параметры запроса
     const queryConstraints = useMemo(() => {
@@ -184,13 +187,28 @@ export const useProperties = (user) => {
         }
     };
 
-    // Загрузка properties пользователя из Firestore с real-time обновлениями
-    // Передаем зависимости [userId, role, user?.email] для корректного переподключения
-    const { data: properties, loading, error } = useFirestoreCollection(
-        userId ? 'properties' : null,
-        queryConstraints,
-        [userId, role, user?.email]
-    );
+    const loadProperties = async () => {
+        if (!userId) {
+            setProperties([]);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
+        const response = await firestoreOperations.getCollection('properties', queryConstraints);
+        if (response.success) {
+            setProperties(response.data || []);
+            setError(null);
+        } else {
+            setError(response.error);
+        }
+        setLoading(false);
+    };
+
+    // One-time загрузка properties пользователя из Firestore (без real-time подписок)
+    useEffect(() => {
+        loadProperties();
+    }, [userId, role, user?.email]);
 
     return {
         properties: properties || [],
@@ -198,6 +216,7 @@ export const useProperties = (user) => {
         error,
         addProperty,
         updateProperty,
-        deleteProperty
+        deleteProperty,
+        refreshProperties: loadProperties
     };
 };
