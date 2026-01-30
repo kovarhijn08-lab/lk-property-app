@@ -66,14 +66,28 @@ export const AuthProvider = ({ children }) => {
                             ...userData
                         });
                     } else {
-                        // Fallback for new users or missing docs
-                        skynet.warn(`User document not found for ${user.email}`, { userId: user.uid });
-                        setCurrentUser({
+                        // Fallback for new users or missing docs: create minimal profile
+                        const fallbackName = user.displayName || user.email?.split('@')[0] || 'User';
+                        const fallbackData = {
                             id: user.uid,
+                            name: fallbackName,
                             email: user.email,
-                            name: user.displayName,
-                            role: 'tenant'
-                        });
+                            role: 'owner',
+                            onboardingCompleted: false,
+                            createdAt: new Date().toISOString(),
+                            preferences: { currency: 'USD', isDemoMode: false }
+                        };
+
+                        skynet.warn(`User document not found for ${user.email}`, { userId: user.uid });
+                        setCurrentUser(fallbackData);
+
+                        try {
+                            await setDoc(doc(db, 'users', user.uid), fallbackData);
+                            skynet.info('User document auto-created', { userId: user.uid });
+                        } catch (err) {
+                            console.error('[AuthContext] User document auto-create failed:', err);
+                            skynet.error('User document auto-create failed', { error: err.message, userId: user.uid });
+                        }
                     }
                     setLoading(false);
                 }, (error) => {

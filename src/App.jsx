@@ -70,7 +70,7 @@ function App() {
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Properties from Firestore (replacing localStorage)
-  const { properties, loading: propertiesLoading, error: propertiesError, addProperty: addPropertyToFirestore, updateProperty: updatePropertyInFirestore, deleteProperty: deletePropertyFromFirestore } = useProperties(currentUser);
+  const { properties, loading: propertiesLoading, error: propertiesError, addProperty: addPropertyToFirestore, updateProperty: updatePropertyInFirestore, deleteProperty: deletePropertyFromFirestore, refreshProperties } = useProperties(currentUser);
   const { vendors, addVendor, deleteVendor } = useVendors(currentUser?.id);
 
   const [selectedPropertyId, setSelectedPropertyId] = useState('all');
@@ -240,6 +240,13 @@ function App() {
     }
   };
 
+  const handleRetryDataLoad = async () => {
+    setSafeMode(false);
+    setLoadFailures(0);
+    sessionStorage.setItem('pocketLedger_load_failures', '0');
+    await refreshProperties();
+  };
+
   // [NEW] Global Error Tracking
   useEffect(() => {
     const handleError = (event) => {
@@ -348,7 +355,13 @@ function App() {
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
             {t('safeMode.description')}
           </p>
+          {propertiesError && (
+            <div style={{ marginTop: '12px', color: '#F59E0B', fontSize: '0.8rem' }}>
+              {propertiesError}
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '24px' }}>
+            <button onClick={handleRetryDataLoad} className="btn-primary" style={{ width: '100%' }}>{t('safeMode.retry')}</button>
             <button onClick={() => setSafeMode(false)} className="btn-primary" style={{ width: '100%' }}>{t('safeMode.tryRegular')}</button>
             {isAdmin && (
               <button onClick={resetEverything} style={{ width: '100%', padding: '12px', background: 'rgba(244, 63, 94, 0.1)', border: '1px solid #F43F5E', color: '#F43F5E', borderRadius: '12px', cursor: 'pointer', fontWeight: 700 }}>{t('safeMode.wipeCache')}</button>

@@ -318,6 +318,7 @@ export const translations = {
         safeMode: {
             title: 'System Protection Active',
             description: 'The app encountered multiple failures during startup. This usually happens due to corrupted local data or network issues.',
+            retry: 'Retry Data Load',
             tryRegular: 'Try Regular Mode',
             wipeCache: 'Reset Cache (Wipe Data)',
             loadingError: 'Problem loading data. Please refresh.',
@@ -421,6 +422,7 @@ export const translations = {
         safeMode: {
             title: 'System Protection Active',
             description: 'The app encountered multiple failures during startup. This usually happens due to corrupted local data or network issues.',
+            retry: 'Retry Data Load',
             tryRegular: 'Try Regular Mode',
             wipeCache: 'Reset Cache (Wipe Data)',
             loadingError: 'Problem loading data. Please refresh.',
@@ -918,6 +920,7 @@ export const translations = {
         safeMode: {
             title: 'Безопасный режим активен',
             description: 'Приложение обнаружило несколько сбоев при запуске. Это может быть связано с поврежденными данными или проблемами сети.',
+            retry: 'Повторить загрузку',
             tryRegular: 'Обычный режим',
             wipeCache: 'Сбросить кеш (Очистить данные)',
             loadingError: 'Проблема при загрузке данных. Попробуйте обновить.',
