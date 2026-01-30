@@ -3,8 +3,8 @@
 ## A) CI Workflow Proof (GitHub Actions)
 - Workflow name: Deploy Firestore Rules
 - Workflow Path: `.github/workflows/firestore-deploy.yml` (Fixed & Standardized)
-- Latest run URL: 
-- Run status: ☐ success ☐ failed
+- Latest run URL: https://github.com/kovarhijn08-lab/lk-property-app/actions/runs/21508827707
+- Run status: ☑ success ☐ failed
 - Screenshot attached: ☐
  - TODO: Add GitHub Actions run URL + screenshot
  - How to verify:
