@@ -29,7 +29,7 @@ const MobileNav = ({ activeView, onViewChange, onActionClick, onOpenNotification
             bottom: 0,
             left: 0,
             right: 0,
-            zIndex: 9999, // Ensure highest z-index
+            zIndex: 900, // Keep below drawers/modals but above base content
             pointerEvents: 'auto' // Force pointer events
         }}>
             {navItems.map(item => {

@@ -41,7 +41,7 @@ const SideDrawer = ({ isOpen, onClose, title, subtitle, children, width = '500px
         <div style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 1000,
+            zIndex: 1400,
             visibility: isOpen ? 'visible' : 'hidden',
             transition: 'visibility 0.4s'
         }}>

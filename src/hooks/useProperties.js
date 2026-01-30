@@ -200,7 +200,22 @@ export const useProperties = (user) => {
             setProperties(response.data || []);
             setError(null);
         } else {
-            setError(response.error);
+            const errorMessage = String(response.error || '');
+            const shouldFallback = /failed-precondition|permission|requires an index/i.test(errorMessage);
+            const fallbackConstraints = [where('userId', '==', userId)];
+
+            if (shouldFallback && queryConstraints.length > 0) {
+                console.warn('[Properties] Falling back to userId query due to query error:', errorMessage);
+                const fallbackResponse = await firestoreOperations.getCollection('properties', fallbackConstraints);
+                if (fallbackResponse.success) {
+                    setProperties(fallbackResponse.data || []);
+                    setError(null);
+                } else {
+                    setError(fallbackResponse.error);
+                }
+            } else {
+                setError(response.error);
+            }
         }
         setLoading(false);
     };
