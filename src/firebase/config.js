@@ -44,7 +44,9 @@ export const analytics = getAnalytics(app);
 // Optional local emulator support
 const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
 if (useEmulators) {
-    const emulatorHost = import.meta.env.VITE_FIREBASE_EMULATOR_HOST || 'localhost';
+    const rawHost = import.meta.env.VITE_FIREBASE_EMULATOR_HOST || 'localhost';
+    // Force IPv4 to avoid localhost resolving to ::1 when emulators bind to 127.0.0.1
+    const emulatorHost = rawHost === 'localhost' ? '127.0.0.1' : rawHost;
     const firestorePort = Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080);
     const authPort = Number(import.meta.env.VITE_AUTH_EMULATOR_PORT || 9099);
     const storagePort = Number(import.meta.env.VITE_STORAGE_EMULATOR_PORT || 9199);

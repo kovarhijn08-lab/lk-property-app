@@ -6,7 +6,7 @@ import { skynet } from '../utils/SkynetLogger';
 
 const Onboarding = ({ onComplete }) => {
     const { currentUser, updatePreferences, logout } = useAuth();
-    const { t } = useLanguage();
+    const { t, setLang } = useLanguage();
     const [step, setStep] = useState(1);
     const [role, setRole] = useState(currentUser?.role || null); // 'pmc', 'owner', 'tenant'
     const [loading, setLoading] = useState(false);
@@ -31,8 +31,6 @@ const Onboarding = ({ onComplete }) => {
     const [maintenanceDesc, setMaintenanceDesc] = useState(''); // For Tenant
     const isRoleLocked = !!currentUser?.role;
 
-    const { setLanguage } = useLanguage();
-
     const handleRoleSelect = async (selectedRole) => {
         setLoading(true);
         try {
@@ -43,7 +41,7 @@ const Onboarding = ({ onComplete }) => {
                 phone: userPhone,
                 language: userLang
             });
-            if (userLang) setLanguage(userLang);
+            if (userLang) setLang(userLang);
 
             setRole(finalRole);
             setStep(2);

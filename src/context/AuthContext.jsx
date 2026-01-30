@@ -75,6 +75,7 @@ export const AuthProvider = ({ children }) => {
                             role: 'owner',
                             onboardingCompleted: false,
                             createdAt: new Date().toISOString(),
+                            lastLogin: new Date().toISOString(),
                             preferences: { currency: 'USD', isDemoMode: false }
                         };
 
@@ -235,6 +236,7 @@ export const AuthProvider = ({ children }) => {
                 role: finalRole,
                 onboardingCompleted: finalRole === 'tenant', // Tenants skip onboarding for now
                 createdAt: new Date().toISOString(),
+                lastLogin: new Date().toISOString(),
                 preferences: { currency: 'USD', isDemoMode: false },
                 linkedPropertyId,
                 linkedUnitId,

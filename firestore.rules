@@ -54,10 +54,23 @@ service cloud.firestore {
     }
 
     function isSafeUserUpdate() {
-      return request.resource.data.role == resource.data.role
-        && request.resource.data.email == resource.data.email
-        && request.resource.data.lastLogin == resource.data.lastLogin
-        && request.resource.data.preferences.isDemoMode == resource.data.preferences.isDemoMode;
+      let newData = request.resource.data;
+      let oldData = resource.data;
+      let keys = newData.keys();
+      return newData.diff(oldData).affectedKeys().hasOnly([
+          'name',
+          'phone',
+          'language',
+          'preferences',
+          'onboardingCompleted',
+          'onboardingStep',
+          'onboardingAt',
+          'managementPreference',
+          'lastLogin',
+          'updatedAt'
+        ])
+        && (!keys.hasAny(['role']) || newData.role == oldData.role)
+        && (!keys.hasAny(['email']) || newData.email == oldData.email);
     }
 
     // Правила для коллекции объектов (properties)
@@ -113,7 +126,7 @@ service cloud.firestore {
           )
         )
         && request.resource.data.role != 'admin'
-        && request.resource.data.email == request.auth.token.email;
+        && (request.auth.token.email == null || request.resource.data.email == request.auth.token.email);
       allow update: if isAdmin() || (isSelf(userId) && isSafeUserUpdate());
       allow delete: if isAdmin();
     }
