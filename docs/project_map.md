@@ -49,9 +49,10 @@ This document is the canonical map of the project for handover to other LLMs or 
 - Server‑side Telegram alerts.
 - Error/session correlation.
 - Retry/backoff for Firestore operations.
+- Properties fallback load on index/permission errors (prevents empty list after reload).
+- Mobile overlay stacking fix (bottom nav no longer blocks drawers/modals).
 
 ## 9) Open Items
 - Implement CI lint/build checks.
 - Add staging Firebase project.
 - Populate `firestore.indexes.json`.
-
